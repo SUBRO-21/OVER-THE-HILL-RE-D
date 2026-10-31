@@ -1,5 +1,9 @@
 // Low Range LAN server: serves the game and relays driver positions between devices on the same Wi-Fi.
 // No dependencies. Run with:  node server.js   (optional: PORT=4000 node server.js)
+//
+// How multiplayer works here: each browser drives its own truck and sends where it is about 15 times
+// a second. This server does no physics; it just forwards those messages to the other browsers,
+// remembers which map the group picked, and keeps the session's best times and map pins.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -7,26 +11,49 @@ const crypto = require('crypto');
 const os = require('os');
 
 const PORT = Number(process.env.PORT) || 3000;
-const GAME = path.join(__dirname, 'index.html');
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS) || 3;
+const MAP_COUNT = 5;            // must match the number of REGIONS in js/regions.js + big maps
 const MAX_FRAME = 64 * 1024;
+const MSG_PER_SEC = 60;         // a client sends ~16/s; anything far above that is dropped
+const ROOT = __dirname;
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.json': 'application/json' };
+
+function lanAddresses() {
+  const out = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) if (i.family === 'IPv4' && !i.internal) out.push('http://' + i.address + ':' + PORT);
+  }
+  return out;
+}
 
 const server = http.createServer((req, res) => {
-  const url = req.url.split('?')[0];
-  if (url === '/' || url === '/index.html') {
-    fs.readFile(GAME, (err, data) => {
-      if (err) { res.writeHead(500); res.end('index.html is missing next to server.js'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(data);
-    });
-    return;
-  }
-  res.writeHead(404); res.end('Not found');
+  let url;
+  try { url = decodeURIComponent(req.url.split('?')[0]); } catch (_) { res.writeHead(400); res.end(); return; }
+  if (url === '/') url = '/index.html';
+  // Only the game page and files under js/ and assets/ are served. Normalising and re-checking the
+  // prefix stops "../" tricks from reading anything else on this computer.
+  const file = path.normalize(path.join(ROOT, url));
+  const allowed = file === path.join(ROOT, 'index.html') || file.startsWith(path.join(ROOT, 'js') + path.sep) || file.startsWith(path.join(ROOT, 'assets') + path.sep);
+  const type = TYPES[path.extname(file).toLowerCase()];
+  if (!allowed || !type) { res.writeHead(404); res.end('Not found'); return; }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404); res.end('Not found'); return; }
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+    res.end(data);
+  });
 });
 
 const clients = new Map();
 let nextId = 1;
 let currentMap = 0;
 const results = {};
+const pins = new Map(); // client id -> { id, x, z, m, name, slot }
+
+function freeSlot() {
+  const used = new Set([...clients.values()].map(c => c.slot));
+  for (let s = 0; s < MAX_PLAYERS; s++) if (!used.has(s)) return s;
+  return -1;
+}
 
 server.on('upgrade', (req, socket) => {
   const key = req.headers['sec-websocket-key'];
@@ -34,9 +61,17 @@ server.on('upgrade', (req, socket) => {
   const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   socket.setNoDelay(true);
-  const c = { id: nextId++, socket, name: 'Driver', buf: Buffer.alloc(0) };
+  const slot = freeSlot();
+  if (slot < 0) {
+    // Tell the browser why, then close. It shows "This game is full" and stops retrying.
+    socket.write(frame(1, Buffer.from(JSON.stringify({ t: 'full', max: MAX_PLAYERS }))));
+    socket.end(frame(8, Buffer.alloc(0)));
+    console.log(`Turned away a driver: already ${MAX_PLAYERS} connected.`);
+    return;
+  }
+  const c = { id: nextId++, slot, socket, name: 'Driver', buf: Buffer.alloc(0), tokens: MSG_PER_SEC, tokT: Date.now() };
   clients.set(c.id, c);
-  send(c, { t: 'welcome', id: c.id, map: currentMap, results });
+  send(c, { t: 'welcome', id: c.id, slot, map: currentMap, results, pins: [...pins.values()], lan: lanAddresses(), max: MAX_PLAYERS });
   socket.on('data', chunk => {
     c.buf = Buffer.concat([c.buf, chunk]);
     if (c.buf.length > MAX_FRAME * 4) { drop(c); return; }
@@ -77,39 +112,60 @@ function broadcast(obj, except) {
   const buf = frame(1, Buffer.from(JSON.stringify(obj)));
   for (const c of clients.values()) if (c !== except && !c.socket.destroyed) c.socket.write(buf);
 }
-function roster() { broadcast({ t: 'roster', players: [...clients.values()].map(c => ({ id: c.id, name: c.name })) }); }
+function roster() {
+  const players = [...clients.values()].map(c => ({ id: c.id, name: c.name, slot: c.slot }));
+  players.max = MAX_PLAYERS;
+  broadcast({ t: 'roster', players, max: MAX_PLAYERS });
+}
 
 function drop(c) {
   if (!clients.delete(c.id)) return;
   c.socket.destroy();
+  pins.delete(c.id);
   broadcast({ t: 'leave', id: c.id });
   roster();
   console.log(`${c.name} left (${clients.size} connected)`);
 }
 
 const cleanName = n => String(n || '').replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, 16) || 'Driver';
+const num = v => typeof v === 'number' && Number.isFinite(v);
+
+// Token bucket: refills MSG_PER_SEC tokens per second, each message costs one.
+function allow(c) {
+  const now = Date.now();
+  c.tokens = Math.min(MSG_PER_SEC, c.tokens + (now - c.tokT) / 1000 * MSG_PER_SEC); c.tokT = now;
+  if (c.tokens < 1) return false;
+  c.tokens -= 1; return true;
+}
 
 function handleFrame(c, f) {
   if (f.op === 8) { drop(c); return; }
   if (f.op === 9) { c.socket.write(frame(10, f.data)); return; }
-  if (f.op !== 1) return;
+  if (f.op !== 1 || !allow(c)) return;
   let m;
   try { m = JSON.parse(f.data.toString('utf8')); } catch (_) { return; }
+  if (!m || typeof m !== 'object') return;
   switch (m.t) {
     case 'hello':
       c.name = cleanName(m.name);
-      console.log(`${c.name} joined (${clients.size} connected)`);
+      console.log(`${c.name} joined (${clients.size} of ${MAX_PLAYERS} connected)`);
       roster();
       break;
     case 'map':
-      if (Number.isInteger(m.m) && m.m >= 0 && m.m < 3) { currentMap = m.m; broadcast({ t: 'map', m: m.m, by: c.name }, c); }
+      if (Number.isInteger(m.m) && m.m >= 0 && m.m < MAP_COUNT) { currentMap = m.m; broadcast({ t: 'map', m: m.m, by: c.name }, c); }
       break;
     case 's':
       c.name = cleanName(m.n);
-      broadcast({ ...m, t: 's', id: c.id, n: c.name }, c);
+      broadcast({ ...m, t: 's', id: c.id, n: c.name, sl: c.slot }, c);
+      break;
+    case 'pin':
+      if (m.x === null) { pins.delete(c.id); broadcast({ t: 'pin', id: c.id, x: null }, c); break; }
+      if (!num(m.x) || !num(m.z) || !Number.isInteger(m.m)) return;
+      pins.set(c.id, { id: c.id, x: m.x, z: m.z, m: m.m, name: c.name, slot: c.slot });
+      broadcast({ t: 'pin', ...pins.get(c.id) }, c);
       break;
     case 'finish': {
-      if (!Number.isInteger(m.m) || typeof m.time !== 'number') return;
+      if (!Number.isInteger(m.m) || !num(m.time)) return;
       const list = results[m.m] || (results[m.m] = []);
       list.push({ name: c.name, time: m.time, cairns: m.cairns | 0 });
       list.sort((a, b) => a.time - b.time);
@@ -121,11 +177,19 @@ function handleFrame(c, f) {
   }
 }
 
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') console.log(`\nPort ${PORT} is already in use. Is Low Range already running in another window?\n`);
+  else console.log(err);
+  process.exit(1);
+});
 server.listen(PORT, '0.0.0.0', () => {
   console.log('\nLow Range server is running.\n');
   console.log('On this computer:   http://localhost:' + PORT);
-  for (const list of Object.values(os.networkInterfaces())) {
-    for (const i of list || []) if (i.family === 'IPv4' && !i.internal) console.log('Other devices:      http://' + i.address + ':' + PORT);
-  }
-  console.log('\nEvery device must be on the same Wi-Fi. Press Ctrl+C to stop.\n');
+  const lan = lanAddresses();
+  for (const a of lan) console.log('Friends open:       ' + a);
+  if (!lan.length) console.log('No Wi-Fi address found. Connect this computer to the Wi-Fi your friends are on.');
+  console.log(`\nUp to ${MAX_PLAYERS} drivers. Everyone must be on the same Wi-Fi.`);
+  console.log('If friends cannot connect: when Windows asks, allow Node.js on Private networks.');
+  console.log('(Missed it? Windows Security > Firewall > Allow an app > tick Node.js for Private.)');
+  console.log('Keep this window open while you play. Press Ctrl+C to stop.\n');
 });

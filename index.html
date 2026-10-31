@@ -1,4 +1,5 @@
 <title>Low Range</title>
+<link rel="icon" href="data:,">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -154,6 +155,38 @@ body.touch .touch-note{display:block}
 @media (prefers-reduced-motion:reduce){
   #toast,#fade{transition:none}
 }
+
+/* Big maps take half a row, quick maps a third */
+.maps{grid-template-columns:repeat(6,minmax(0,1fr))}
+.map-btn{grid-column:span 2}
+.map-btn.big{grid-column:span 3}
+.map-btn.big b{font-size:21px}
+.cars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.car-btn{text-align:left;background:rgba(20,26,21,.6);border:1px solid var(--line);border-radius:3px;padding:8px 10px;cursor:pointer;display:grid;gap:2px}
+.car-btn:hover{border-color:var(--paper-dim)}
+.car-btn[aria-pressed="true"]{border-color:var(--amber);background:rgba(240,165,58,.12)}
+.car-btn b{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.03em;text-transform:uppercase;line-height:1}
+.car-btn span{font-size:12px;color:var(--paper-dim);line-height:1.25}
+.pick-label{margin-bottom:-8px}
+#lanBox{display:grid;gap:4px}
+.lan-row{display:flex;gap:8px;flex-wrap:wrap}
+#lanUrl{background:rgba(20,26,21,.7);border:1px solid var(--line);border-radius:3px;color:var(--amber);font-family:var(--f-mono);font-size:15px;padding:7px 10px;width:min(260px,100%);-webkit-user-select:text;user-select:text}
+.btn.small{padding:7px 14px;font-size:15px}
+#netStatus .warn{color:var(--rust)}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,13,10,.72);z-index:5}
+#loading .panel{padding:18px 26px;font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:.05em;text-transform:uppercase}
+.mm-ctl{display:flex;gap:4px;margin-top:5px;max-width:150px}
+.mm-ctl button{flex:1;background:transparent;border:1px solid var(--line);border-radius:2px;font-family:var(--f-mono);font-size:10.5px;padding:3px 4px;cursor:pointer;color:var(--paper)}
+.mm-ctl button:hover{border-color:var(--paper-dim)}
+#mmFoot{margin-top:5px;font-family:var(--f-mono);font-size:10.5px;color:var(--paper-dim);max-width:150px;text-align:center}
+.bigmap-hint{font-size:12px;color:var(--paper-dim)}
+#bigmapC{cursor:crosshair}
+@media (max-width:640px){
+  .maps{grid-template-columns:1fr}
+  .map-btn,.map-btn.big{grid-column:auto}
+  .cars{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mm-ctl,#mmFoot{max-width:104px}
+}
 </style>
 
 <canvas id="view" aria-label="Game view"></canvas>
@@ -163,10 +196,19 @@ body.touch .touch-note{display:block}
     <div class="region" id="hudRegion">Pinewood Hollow</div>
     <div class="row mono"><span id="hudClock">07:30</span><span id="hudWeather">Clear</span><span id="hudNet">Solo</span></div>
     <div class="race"><span id="hudTime" class="mono">00:00.0</span><span id="hudToGo" class="mono">— to finish</span></div>
+    <div class="row" id="hudPostsRow" hidden><span class="label">Survey posts</span><span id="hudPosts" class="mono">0 / 5</span></div>
     <div class="row"><span class="label">Bonus cairns</span><span id="hudCairns" class="mono">0 / 6</span></div>
   </div>
   <canvas id="compass" aria-label="Compass"></canvas>
-  <div class="hud-tr panel" id="miniWrap" title="Open the full map (M)"><canvas id="map" width="300" height="300" aria-label="Map"></canvas></div>
+  <div class="hud-tr panel" id="miniWrap">
+    <canvas id="map" width="300" height="300" aria-label="Minimap. Click to open the full map." title="Open the full map (M)"></canvas>
+    <div class="mm-ctl">
+      <button id="mmIn" type="button" title="Zoom in (Page Up)" aria-label="Zoom in">+</button>
+      <button id="mmOut" type="button" title="Zoom out (Page Down)" aria-label="Zoom out">−</button>
+      <button id="mmRotate" type="button" title="Heading up / north up (T)" aria-pressed="true">Heading up</button>
+    </div>
+    <div id="mmFoot" hidden></div>
+  </div>
   <div class="hud-bl panel">
     <div class="speed"><span id="hudSpeed">0</span><small>KM/H</small></div>
     <div class="chips"><span id="hudGear" class="chip">4H</span><span id="hudLights" class="chip dim">LIGHTS</span><span id="hudWinchChip" class="chip dim">WINCH</span></div>
@@ -181,11 +223,13 @@ body.touch .touch-note{display:block}
     <kbd>A D</kbd><span>Steer</span>
     <kbd>Space</kbd><span>Handbrake</span>
     <kbd>L</kbd><span>Transfer case 4H / 4L</span>
-    <kbd>E</kbd><span>Winch to nearest tree</span>
-    <kbd>M</kbd><span>Full map</span>
+    <kbd>E</kbd><span>Winch to a tree, rock or post</span>
+    <kbd>C</kbd><span>Chase / driver's seat / hood</span>
+    <kbd>M</kbd><span>Full map (click it to drop a pin)</span>
+    <kbd>PgUp PgDn</kbd><span>Minimap zoom</span>
+    <kbd>T</kbd><span>Minimap heading up / north up</span>
     <kbd>H</kbd><span>Headlights</span>
     <kbd>R</kbd><span>Recover vehicle</span>
-    <kbd>C</kbd><span>Chase / hood camera</span>
     <kbd>V</kbd><span>Change paint</span>
     <kbd>P</kbd><span>Photo mode</span>
     <kbd>N</kbd><span>Sound on / off</span>
@@ -197,15 +241,16 @@ body.touch .touch-note{display:block}
 
 <div id="bigmap" hidden>
   <div class="bigmap-card panel">
-    <div class="bigmap-head"><span class="region" id="bmTitle">Pinewood Hollow</span><span class="label">M or tap to close</span></div>
-    <canvas id="bigmapC" width="720" height="720" aria-label="Full map"></canvas>
+    <div class="bigmap-head"><span class="region" id="bmTitle">Pinewood Hollow</span><span class="label">M or click outside to close</span></div>
+    <canvas id="bigmapC" width="720" height="720" aria-label="Full map. Click to drop a pin."></canvas>
     <div class="legend mono">
       <span><i style="background:#f0a53a"></i>You</span>
-      <span><i style="background:#7fd0e6"></i>Other drivers</span>
+      <span><i style="background:#7fd0e6"></i>Next survey post</span>
       <span><i style="background:#86a35b"></i>Start</span>
       <span><i style="background:#cf5d33"></i>Finish</span>
       <span><i style="background:#f1ead9"></i>Logged cairn</span>
     </div>
+    <div class="bigmap-hint">Click the map to drop a pin that everyone on this map can see. Click your pin again to remove it.</div>
   </div>
 </div>
 
@@ -233,6 +278,7 @@ body.touch .touch-note{display:block}
     <button class="small" data-tap="KeyL">4H / 4L</button>
     <button class="small" data-tap="KeyE">Winch</button>
     <button class="small" data-tap="KeyM">Map</button>
+    <button class="small" data-tap="KeyC">View</button>
     <button class="small" data-tap="KeyH">Lights</button>
     <button class="small" data-tap="KeyR">Recover</button>
     <button class="small" data-tap="KeyP">Photo</button>
@@ -245,18 +291,21 @@ body.touch .touch-note{display:block}
 
 <div id="title">
   <div class="title-inner">
-    <div class="eyebrow">Free · plays in your browser · drive together on one Wi-Fi</div>
+    <div class="eyebrow">Free · plays in your browser · up to 3 drivers on one Wi-Fi</div>
     <h1>Low <span>Range</span></h1>
-    <p class="lede">Pick a map and drive an old 4x4 from the start arch to the finish arch across open country. Crawl through mud in low range, winch yourself out of trouble, and log the survey cairns on the way for a bonus.</p>
-    <div class="maps" role="group" aria-label="Choose a map">
-      <button class="map-btn" type="button" data-map="0" aria-pressed="true"><b>Pinewood Hollow</b><span>Pine forest, mud and lakes</span><span class="mono" data-dist>— m route</span></button>
-      <button class="map-btn" type="button" data-map="1" aria-pressed="false"><b>Red Mesa</b><span>Terraced desert, soft sand</span><span class="mono" data-dist>— m route</span></button>
-      <button class="map-btn" type="button" data-map="2" aria-pressed="false"><b>Whiteback Pass</b><span>Snowfields and frozen lakes</span><span class="mono" data-dist>— m route</span></button>
-    </div>
+    <p class="lede">Pick a map and a vehicle, then drive from the start arch to the finish across open country. Crawl through mud in low range, winch yourself out of trouble, and log survey posts and cairns on the way.</p>
+    <span class="label pick-label">Map</span>
+    <div class="maps" id="maps" role="group" aria-label="Choose a map"></div>
+    <span class="label pick-label">Vehicle</span>
+    <div class="cars" id="cars" role="group" aria-label="Choose a vehicle"></div>
     <div class="driver">
       <label><span class="label">Driver name</span><input id="playerName" type="text" maxlength="16" autocomplete="off" spellcheck="false"></label>
     </div>
     <div id="netStatus">Solo.</div>
+    <div id="lanBox" hidden>
+      <span class="label">Friends on this Wi-Fi open this address</span>
+      <div class="lan-row"><input id="lanUrl" type="text" readonly aria-label="Address for friends"><button id="lanCopy" class="btn ghost small" type="button">Copy link</button></div>
+    </div>
     <div class="start-row">
       <button id="startBtn" class="btn primary" type="button">Start driving</button>
       <span class="label">or press Enter</span>
@@ -266,1358 +315,30 @@ body.touch .touch-note{display:block}
       <div><kbd>A D</kbd>Steer</div>
       <div><kbd>L</kbd>4H / 4L</div>
       <div><kbd>E</kbd>Winch</div>
+      <div><kbd>C</kbd>Camera</div>
       <div><kbd>M</kbd>Map</div>
-      <div><kbd>R</kbd>Recover</div>
     </div>
     <p class="touch-note">Use the on-screen pedals and steering. Drag the scene to look around.</p>
   </div>
 </div>
+<div id="loading" hidden><div class="panel" id="loadingText">Building map…</div></div>
 <div id="fade"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-(() => {
-'use strict';
-const $ = s => document.querySelector(s);
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-const wrapAngle = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
-const fmtTime = s => { const m = Math.floor(s / 60), r = s - m * 60; return `${String(m).padStart(2, '0')}:${r.toFixed(1).padStart(4, '0')}`; };
-const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const V3 = THREE.Vector3;
-
-/* ---------- Noise ---------- */
-function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function hash2(ix, iz, seed) {
-  let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(seed, 982451653)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-function vnoise(x, z, seed) {
-  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
-  const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
-  const a = hash2(ix, iz, seed), b = hash2(ix + 1, iz, seed), c = hash2(ix, iz + 1, seed), d = hash2(ix + 1, iz + 1, seed);
-  return (a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz) * 2 - 1;
-}
-function fbm(x, z, seed, oct) {
-  let s = 0, a = 0.5, f = 1, n = 0;
-  for (let i = 0; i < oct; i++) { s += a * vnoise(x * f, z * f, seed + i * 17); n += a; a *= 0.5; f *= 2.03; }
-  return s / n;
-}
-
-/* ---------- Surfaces & maps ---------- */
-const SURF = {
-  grass:   { name: 'Grass',     mu: .90, rr: .04, sink: 0 },
-  dust:    { name: 'Hardpack',  mu: .82, rr: .05, sink: 0 },
-  snow:    { name: 'Snow',      mu: .60, rr: .10, sink: .06 },
-  rock:    { name: 'Rock',      mu: 1.05, rr: .02, sink: 0 },
-  mud:     { name: 'Mud',       mu: .52, rr: .34, sink: .18 },
-  sand:    { name: 'Soft sand', mu: .66, rr: .20, sink: .10 },
-  ice:     { name: 'Ice',       mu: .26, rr: .02, sink: 0 },
-  bed:     { name: 'Riverbed',  mu: .60, rr: .12, sink: .05 },
-};
-const REGIONS = [
-  { name: 'Pinewood Hollow', seed: 11, amp: 46, ridge: 16, bump: 2.2, wl: -9, terrace: 0, ground: 'grass', patch: 'mud', patchT: .18,
-    start: [-250, -250], end: [250, 235],
-    low: '#6f8a3c', mid: '#557535', high: '#8f9468', rock: '#8a8277', patchC: '#5b4330', shore: '#b5a274', water: '#3e7b80',
-    tree: ['#2e5634', '#3d6a37', '#47703a'], cap: null, trunk: '#5b3e2a', shape: 'pine', treeCount: 1200, forest: -0.05,
-    skyDay: ['#5d9bd0', '#d4e6e8'], weather: 'rain', rainChance: .35, dust: '#8f7d58' },
-  { name: 'Red Mesa', seed: 29, amp: 40, ridge: 22, bump: 1.4, wl: -18, terrace: 7, ground: 'dust', patch: 'sand', patchT: .12,
-    start: [-275, 10], end: [270, -15],
-    low: '#c98a55', mid: '#b5653d', high: '#d7a46c', rock: '#9b4e32', patchC: '#e3c38f', shore: '#d6b98c', water: '#4b8c86',
-    tree: ['#6c7b3f', '#7f8b48'], cap: null, trunk: '#6a4a33', shape: 'bush', treeCount: 420, forest: -0.3,
-    skyDay: ['#4f94d6', '#f1d5ae'], weather: 'rain', rainChance: .1, dust: '#d9a873' },
-  { name: 'Whiteback Pass', seed: 47, amp: 58, ridge: 26, bump: 2.6, wl: -12, terrace: 0, ground: 'snow', patch: 'ice', patchT: .2, frozen: true,
-    start: [15, 275], end: [-10, -262],
-    low: '#dfe7ea', mid: '#cdd9df', high: '#f6f9fb', rock: '#68717a', patchC: '#a8d0e2', shore: '#c5d3d9', water: '#2e5d76',
-    tree: ['#27453a', '#31523f'], cap: ['#e4ecef', '#d6e2e7', '#31523f'], trunk: '#4a3a2f', shape: 'pine', treeCount: 850, forest: 0,
-    skyDay: ['#86acd0', '#e6eef3'], weather: 'snow', rainChance: .45, dust: '#f4f8fa' },
-];
-const CAIRNS_PER_REGION = 6;
-const PAINTS = [['Rust', '#c4572e'], ['Pine', '#3d6151'], ['Sand', '#d6bf7c'], ['Slate blue', '#3f5577'], ['Bone', '#e6dfcc'], ['Signal yellow', '#e2a72e']];
-const routeLen = R => Math.hypot(R.end[0] - R.start[0], R.end[1] - R.start[1]);
-const routeYaw = R => Math.atan2(R.end[0] - R.start[0], R.end[1] - R.start[1]);
-
-/* ---------- Renderer & scene ---------- */
-const canvas = $('#view');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(62, 1, 0.2, 1600);
-scene.fog = new THREE.Fog(0xcfe0e6, 80, 430);
-
-const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x4a5a30, 0.6);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 420 });
-sun.shadow.bias = -0.0006;
-sun.shadow.normalBias = 0.04;
-scene.add(sun, sun.target);
-
-const skyMat = new THREE.ShaderMaterial({
-  uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() } },
-  vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-  fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(vP.y*1.7+0.04,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, pow(h,0.65)), 1.0); }',
-  side: THREE.BackSide, depthWrite: false, fog: false,
-});
-const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1000, 24, 12), skyMat);
-skyDome.renderOrder = -2;
-scene.add(skyDome);
-const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(26, 24), new THREE.MeshBasicMaterial({ color: 0xfff3d8, fog: false, depthWrite: false }));
-const moonDisc = new THREE.Mesh(new THREE.CircleGeometry(14, 24), new THREE.MeshBasicMaterial({ color: 0xdfe6f2, fog: false, depthWrite: false }));
-sunDisc.renderOrder = moonDisc.renderOrder = -1;
-scene.add(sunDisc, moonDisc);
-const stars = (() => {
-  const g = new THREE.BufferGeometry(), n = 700, p = new Float32Array(n * 3), rnd = mulberry(5);
-  for (let i = 0; i < n; i++) {
-    const u = rnd() * Math.PI * 2, v = Math.acos(rnd() * 0.95);
-    p[i * 3] = Math.sin(v) * Math.cos(u) * 950; p[i * 3 + 1] = Math.cos(v) * 950; p[i * 3 + 2] = Math.sin(v) * Math.sin(u) * 950;
-  }
-  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-  const s = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
-  s.renderOrder = -1; scene.add(s); return s;
-})();
-
-/* ---------- Terrain grid ---------- */
-const SIZE = 800, N = 200, CELL = SIZE / N, HALF = SIZE / 2, W1 = N + 1;
-const H = new Float32Array(W1 * W1);
-let R = REGIONS[0];
-let world = new THREE.Group(); scene.add(world);
-let obstacles = new Map(); const OC = 12;
-let cairns = [], finishArch = null;
-const mapImage = document.createElement('canvas'); mapImage.width = mapImage.height = 200;
-
-function rawHeight(x, z, flat) {
-  const s = R.s;
-  let h = fbm(x * 0.0034, z * 0.0034, s, 5) * R.amp;
-  const rn = 1 - Math.abs(fbm(x * 0.0105 + 40, z * 0.0105 - 13, s + 3, 4));
-  h += (rn * rn - 0.4) * R.ridge;
-  h += fbm(x * 0.045, z * 0.045, s + 9, 3) * R.bump;
-  if (R.terrace) { const st = R.terrace, t = h / st, fl = Math.floor(t); h = (fl + smooth(0.25, 0.75, t - fl)) * st; }
-  if (flat) for (const pad of R.pads) h = lerp(pad.h, h, smooth(16, 50, Math.hypot(x - pad.x, z - pad.z)));
-  h += smooth(318, 398, Math.max(Math.abs(x), Math.abs(z))) * 75;
-  if (R.frozen) h = Math.max(h, R.wl);
-  return h;
-}
-const nearPad = (x, z, d) => R.pads.some(p => Math.hypot(x - p.x, z - p.z) < d);
-function cellLookup(x, z) {
-  const gx = clamp((x + HALF) / CELL, 0, N - 1e-4), gz = clamp((z + HALF) / CELL, 0, N - 1e-4);
-  const i = Math.floor(gx), j = Math.floor(gz);
-  return [i, j, gx - i, gz - j];
-}
-function heightAt(x, z) {
-  const [i, j, fx, fz] = cellLookup(x, z);
-  const h00 = H[i + j * W1], h10 = H[i + 1 + j * W1], h01 = H[i + (j + 1) * W1], h11 = H[i + 1 + (j + 1) * W1];
-  if (fx + fz <= 1) return h00 + (h10 - h00) * fx + (h01 - h00) * fz;
-  return h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
-}
-function normalAt(x, z, out) {
-  const [i, j, fx, fz] = cellLookup(x, z);
-  const h00 = H[i + j * W1], h10 = H[i + 1 + j * W1], h01 = H[i + (j + 1) * W1], h11 = H[i + 1 + (j + 1) * W1];
-  let dx, dz;
-  if (fx + fz <= 1) { dx = (h10 - h00) / CELL; dz = (h01 - h00) / CELL; }
-  else { dx = (h11 - h01) / CELL; dz = (h11 - h10) / CELL; }
-  return out.set(-dx, 1, -dz).normalize();
-}
-const patchAt = (x, z) => fbm(x * 0.021 + R.s * 0.37, z * 0.021 - R.s * 0.21, R.s + 77, 3) > R.patchT && !nearPad(x, z, 22);
-function surfaceAt(x, z, ny, h) {
-  if (R.frozen && h <= R.wl + 0.08) return SURF.ice;
-  if (!R.frozen && h < R.wl - 0.1) return SURF.bed;
-  if (ny < 0.8) return SURF.rock;
-  if (patchAt(x, z)) return SURF[R.patch];
-  return SURF[R.ground];
-}
-const _c1 = new THREE.Color(), _c2 = new THREE.Color();
-function terrainColor(x, z, h, ny, out) {
-  if (R.frozen && h <= R.wl + 0.05) return out.set(R.patchC);
-  if (h < R.wl + 0.8) { out.set(R.shore); if (h < R.wl) out.multiplyScalar(0.72); return out; }
-  if (ny < 0.8) return out.set(R.rock).lerp(_c1.set(R.mid), smooth(0.72, 0.8, ny) * 0.5);
-  if (patchAt(x, z)) return out.set(R.patchC);
-  const t = smooth(R.wl + 2, R.wl + 55, h);
-  if (t < 0.5) return out.set(R.low).lerp(_c2.set(R.mid), t * 2);
-  return out.set(R.mid).lerp(_c2.set(R.high), (t - 0.5) * 2);
-}
-
-function addObstacle(o) {
-  const k = Math.floor((o.x + HALF) / OC) + ',' + Math.floor((o.z + HALF) / OC);
-  if (!obstacles.has(k)) obstacles.set(k, []);
-  obstacles.get(k).push(o);
-}
-function nearbyObstacles(x, z, fn) {
-  const cx = Math.floor((x + HALF) / OC), cz = Math.floor((z + HALF) / OC);
-  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-    const l = obstacles.get((cx + a) + ',' + (cz + b)); if (l) for (const o of l) fn(o);
-  }
-}
-
-function buildTerrain() {
-  const pos = new Float32Array(N * N * 18), col = new Float32Array(N * N * 18);
-  let o = 0; const c = new THREE.Color();
-  const tri = (ax, ay, az, bx, by, bz, cx, cy, cz) => {
-    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const nyN = ny / Math.hypot(nx, ny, nz);
-    const mx = (ax + bx + cx) / 3, my = (ay + by + cy) / 3, mz = (az + bz + cz) / 3;
-    terrainColor(mx, mz, my, nyN, c);
-    const j = 0.94 + hash2(Math.floor(mx * 3), Math.floor(mz * 3), 7) * 0.12;
-    pos.set([ax, ay, az, bx, by, bz, cx, cy, cz], o);
-    for (let k = 0; k < 3; k++) { col[o + k * 3] = c.r * j; col[o + k * 3 + 1] = c.g * j; col[o + k * 3 + 2] = c.b * j; }
-    o += 9;
-  };
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const x0 = -HALF + i * CELL, x1 = x0 + CELL, z0 = -HALF + j * CELL, z1 = z0 + CELL;
-    const h00 = H[i + j * W1], h10 = H[i + 1 + j * W1], h01 = H[i + (j + 1) * W1], h11 = H[i + 1 + (j + 1) * W1];
-    tri(x0, h00, z0, x0, h01, z1, x1, h10, z0);
-    tri(x1, h10, z0, x0, h01, z1, x1, h11, z1);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  m.receiveShadow = true; m.castShadow = true;
-  world.add(m);
-  if (!R.frozen) {
-    const wg = new THREE.PlaneGeometry(SIZE, SIZE).rotateX(-Math.PI / 2);
-    const w = new THREE.Mesh(wg, new THREE.MeshPhongMaterial({ color: R.water, transparent: true, opacity: 0.8, shininess: 90, specular: 0x8899aa }));
-    w.position.y = R.wl; w.receiveShadow = true;
-    world.add(w);
-  }
-}
-
-function placeCairns(rnd, found) {
-  const cands = [], n = new V3();
-  for (let t = 0; t < 5000; t++) {
-    const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300, h = heightAt(x, z);
-    if (h < R.wl + 3 || nearPad(x, z, 70)) continue;
-    if (normalAt(x, z, n).y < 0.75) continue;
-    cands.push({ x, z, h, s: h + rnd() * 12 });
-  }
-  cands.sort((a, b) => b.s - a.s);
-  const picked = [];
-  for (const minD of [120, 80, 40]) {
-    for (const c of cands) {
-      if (picked.length >= CAIRNS_PER_REGION) break;
-      if (picked.every(p => Math.hypot(p.x - c.x, p.z - c.z) > minD)) picked.push(c);
-    }
-    if (picked.length >= CAIRNS_PER_REGION) break;
-  }
-  const stoneMat = new THREE.MeshLambertMaterial({ color: R.frozen ? '#7d858c' : '#9a9184', flatShading: true });
-  const poleMat = new THREE.MeshLambertMaterial({ color: '#3a2e24' });
-  cairns = picked.map((c, i) => {
-    const g = new THREE.Group();
-    [[1.0, 0.6], [0.8, 1.6], [0.6, 2.4], [0.42, 3.0]].forEach(([r, y], k) => {
-      const s = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), stoneMat);
-      s.position.y = y; s.rotation.set(k, k * 1.7, k * 0.5); s.castShadow = true; g.add(s);
-    });
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 5), poleMat);
-    pole.position.y = 4.4; g.add(pole);
-    const flagMat = new THREE.MeshLambertMaterial({ color: '#e8742f', side: THREE.DoubleSide });
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), flagMat);
-    flag.position.set(0.62, 5.25, 0); flag.castShadow = true; g.add(flag);
-    g.position.set(c.x, c.h - 0.2, c.z);
-    world.add(g);
-    addObstacle({ x: c.x, z: c.z, y: c.h, r: 1.1, h: 3.5, kind: 'cairn' });
-    const isFound = !!(found && found[i]);
-    if (isFound) flagMat.color.set('#f1ead9');
-    return { x: c.x, z: c.z, y: c.h, found: isFound, flag, flagMat };
-  });
-}
-
-function bannerTexture(text, bg, fg) {
-  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
-  const x = c.getContext('2d');
-  x.fillStyle = bg; x.fillRect(0, 0, 512, 96);
-  x.fillStyle = fg; x.font = '900 64px "Big Shoulders Display", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText(text, 256, 52);
-  return new THREE.CanvasTexture(c);
-}
-function buildArch(x, z, yaw, kind) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: R.frozen ? '#7b838a' : '#8f877a', flatShading: true });
-  const cs = Math.cos(yaw), sn = Math.sin(yaw), base = heightAt(x, z);
-  for (const sx of [-3.6, 3.6]) {
-    for (let k = 0; k < 3; k++) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.6, 1.5), mat);
-      b.position.set(sx + (k % 2 ? 0.08 : -0.06), 0.8 + k * 1.6, 0); b.rotation.y = (k - 1) * 0.08; b.castShadow = true; g.add(b);
-    }
-    addObstacle({ x: x + sx * cs, z: z - sx * sn, y: base, r: 1.0, h: 5, kind: 'arch' });
-  }
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(9, 1.1, 1.7), mat);
-  lintel.position.y = 5.35; lintel.castShadow = true; g.add(lintel);
-  const isFinish = kind === 'finish';
-  const banner = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.1), new THREE.MeshBasicMaterial({
-    map: bannerTexture(isFinish ? 'FINISH' : 'START', isFinish ? '#cf5d33' : '#86a35b', '#f1ead9'), side: THREE.DoubleSide }));
-  banner.position.set(0, 6.5, 0); g.add(banner);
-  let portalMat = null;
-  if (isFinish) {
-    portalMat = new THREE.MeshBasicMaterial({ color: '#f0a53a', transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
-    const portal = new THREE.Mesh(new THREE.PlaneGeometry(5.7, 4.7), portalMat);
-    portal.position.y = 2.35; g.add(portal);
-    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 120, 8, 1, true), new THREE.MeshBasicMaterial({ color: '#f0a53a', transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-    beacon.position.y = 66; g.add(beacon);
-  }
-  g.position.set(x, base - 0.05, z); g.rotation.y = yaw;
-  world.add(g);
-  return { group: g, portalMat, x, z };
-}
-
-function buildTrees(rnd) {
-  const P = R.shape === 'pine' ? [
-    { geo: new THREE.CylinderGeometry(0.16, 0.24, 1.8, 6).translate(0, 0.9, 0), color: 'trunk' },
-    { geo: new THREE.ConeGeometry(1.7, 3.4, 7).translate(0, 2.9, 0), color: 'tree' },
-    { geo: new THREE.ConeGeometry(1.15, 2.6, 7).translate(0, 4.6, 0), color: 'cap' },
-  ] : [
-    { geo: new THREE.CylinderGeometry(0.14, 0.2, 0.8, 5).translate(0, 0.4, 0), color: 'trunk' },
-    { geo: new THREE.IcosahedronGeometry(1.2, 0).scale(1, 0.8, 1).translate(0, 1.4, 0), color: 'tree' },
-    { geo: new THREE.IcosahedronGeometry(0.8, 0).translate(0.6, 1.9, 0.2), color: 'cap' },
-  ];
-  const spots = [], n = new V3();
-  for (let t = 0; t < R.treeCount * 6 && spots.length < R.treeCount; t++) {
-    const x = (rnd() * 2 - 1) * 385, z = (rnd() * 2 - 1) * 385;
-    if (nearPad(x, z, 30)) continue;
-    if (fbm(x * 0.007, z * 0.007, R.s + 5, 3) < R.forest + (rnd() - 0.5) * 0.25) continue;
-    const h = heightAt(x, z);
-    if (h < R.wl + 1.2 || normalAt(x, z, n).y < 0.86 || patchAt(x, z)) continue;
-    if (cairns.some(c => Math.hypot(c.x - x, c.z - z) < 9)) continue;
-    spots.push({ x, z, h, s: 0.8 + rnd() * 0.75, r: rnd() * 6.3, c: rnd() });
-  }
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new V3(), ps = new V3(), Y = new V3(0, 1, 0), col = new THREE.Color();
-  for (const part of P) {
-    const mesh = new THREE.InstancedMesh(part.geo, new THREE.MeshLambertMaterial({ color: part.color === 'trunk' ? R.trunk : '#ffffff', flatShading: true }), spots.length);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    spots.forEach((s, i) => {
-      q.setFromAxisAngle(Y, s.r); sc.set(s.s, s.s * (0.9 + s.c * 0.3), s.s); ps.set(s.x, s.h - 0.15, s.z);
-      mesh.setMatrixAt(i, m4.compose(ps, q, sc));
-      if (part.color !== 'trunk') {
-        const pal = part.color === 'cap' && R.cap ? R.cap : R.tree;
-        mesh.setColorAt(i, col.set(pal[Math.floor(s.c * pal.length) % pal.length]));
-      }
-    });
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    world.add(mesh);
-  }
-  for (const s of spots) addObstacle({ x: s.x, z: s.z, y: s.h, r: (R.shape === 'pine' ? 0.7 : 1.0) * s.s, h: 4, kind: 'tree' });
-}
-
-function buildRocks(rnd) {
-  const count = 320, n = new V3();
-  const mesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true }), count);
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new V3(), ps = new V3(), col = new THREE.Color();
-  let placed = 0;
-  for (let t = 0; t < count * 8 && placed < count; t++) {
-    const x = (rnd() * 2 - 1) * 380, z = (rnd() * 2 - 1) * 380;
-    if (nearPad(x, z, 30)) continue;
-    const h = heightAt(x, z), ny = normalAt(x, z, n).y;
-    if (ny > 0.93 && rnd() > 0.25) continue;
-    const s = 0.9 + Math.pow(rnd(), 2) * 2.4;
-    sc.set(s * (0.8 + rnd() * 0.5), s * (0.5 + rnd() * 0.4), s * (0.8 + rnd() * 0.5));
-    ps.set(x, h - sc.y * 0.25, z);
-    q.setFromEuler(e.set(rnd() * 3, rnd() * 3, rnd() * 3));
-    mesh.setMatrixAt(placed, m4.compose(ps, q, sc));
-    mesh.setColorAt(placed, col.set(R.rock).multiplyScalar(0.85 + rnd() * 0.3));
-    addObstacle({ x, z, y: h, r: (sc.x + sc.z) * 0.42, h: sc.y * 0.8, kind: 'rock' });
-    placed++;
-  }
-  mesh.count = placed;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  world.add(mesh);
-}
-
-function buildMapImage() {
-  const S = 200, ctx = mapImage.getContext('2d'), img = ctx.createImageData(S, S), n = new V3(), c = new THREE.Color(), wc = new THREE.Color(R.water);
-  const L = new V3(-0.5, 0.8, -0.35).normalize();
-  for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
-    const x = -HALF + (i + 0.5) / S * SIZE, z = -HALF + (j + 0.5) / S * SIZE, h = heightAt(x, z);
-    if (!R.frozen && h < R.wl) c.copy(wc);
-    else {
-      normalAt(x, z, n); terrainColor(x, z, h, n.y, c);
-      c.multiplyScalar(0.6 + 0.5 * Math.max(0, n.dot(L)));
-      const band = Math.floor(h / 10);
-      if (band !== Math.floor(heightAt(x + 4, z) / 10) || band !== Math.floor(heightAt(x, z + 4) / 10)) c.multiplyScalar(0.72);
-    }
-    const k = (i + j * S) * 4;
-    img.data[k] = c.r * 255; img.data[k + 1] = c.g * 255; img.data[k + 2] = c.b * 255; img.data[k + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
-function buildRegion(found) {
-  R = REGIONS[state.map];
-  R.s = R.seed;
-  world.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
-    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
-  });
-  scene.remove(world); world = new THREE.Group(); scene.add(world);
-  obstacles = new Map();
-  R.pads = [];
-  R.pads = [R.start, R.end].map(([x, z]) => ({ x, z, h: Math.max(rawHeight(x, z, false), R.wl + 5) }));
-  for (let j = 0; j < W1; j++) for (let i = 0; i < W1; i++) H[i + j * W1] = rawHeight(-HALF + i * CELL, -HALF + j * CELL, true);
-  const rnd = mulberry(R.s * 31 + 7);
-  buildTerrain();
-  placeCairns(rnd, found);
-  const yaw = routeYaw(R);
-  buildArch(R.start[0] + Math.sin(yaw) * 12, R.start[1] + Math.cos(yaw) * 12, yaw, 'start');
-  finishArch = buildArch(R.end[0], R.end[1], yaw, 'finish');
-  buildTrees(rnd);
-  buildRocks(rnd);
-  buildMapImage();
-  hemi.groundColor.set(R.mid).multiplyScalar(0.6);
-  weather.kind = R.weather;
-  rainMat.size = R.weather === 'snow' ? 0.2 : 0.09;
-  $('#hudRegion').textContent = R.name; $('#bmTitle').textContent = R.name;
-  state.loadedMap = state.map;
-}
-
-/* ---------- Vehicle ---------- */
-const M = 1650, G = 9.81, REST = 0.55, WR = 0.42, K = 46000, C = 4100, BRAKE = 30000;
-const IX = 4200, IY = 4600, IZ = 1900;
-const HIGH = { force: 11500, vmax: 44, rev: 9, name: '4H' }, LOW = { force: 19000, vmax: 11, rev: 6, name: '4L' };
-const WHEELS = [[0.82, -0.1, 1.32], [-0.82, -0.1, 1.32], [0.82, -0.1, -1.28], [-0.82, -0.1, -1.28]];
-const CORNERS = [[.9, -.25, 2.05], [-.9, -.25, 2.05], [.9, -.25, -2.05], [-.9, -.25, -2.05], [.85, 1.33, .5], [-.85, 1.33, .5], [.85, 1.33, -1.45], [-.85, 1.33, -1.45], [0, .5, 2.12], [0, .5, -2.18]];
-const car = {
-  p: new V3(), v: new V3(), q: new THREE.Quaternion(), w: new V3(),
-  steer: 0, low: false, stalled: false, winch: null, grounded: 0, safe: new V3(), safeYaw: 0, flipT: 0, safeT: 0,
-  wheel: WHEELS.map(() => ({ comp: 0, d: REST + WR, contact: false, surf: SURF.grass, spinV: 0, angle: 0, slip: 0, vl: 0, cp: new V3(), depth: 0 })),
-};
-
-function buildCarMesh(withLights) {
-  const g = new THREE.Group();
-  const paint = new THREE.MeshLambertMaterial({ color: PAINTS[0][1] });
-  const dark = new THREE.MeshLambertMaterial({ color: 0x23261f });
-  const chrome = new THREE.MeshLambertMaterial({ color: 0xcfcac0 });
-  const glass = new THREE.MeshLambertMaterial({ color: 0x2a3940 });
-  const lampMat = new THREE.MeshBasicMaterial({ color: 0x8a8576 });
-  const tailMat = new THREE.MeshBasicMaterial({ color: 0x6a1a12 });
-  const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
-  box(1.8, 0.7, 4.0, paint, 0, 0.15, 0);
-  box(1.82, 0.1, 1.5, paint, 0, 0.53, 1.2);
-  box(1.68, 0.56, 1.95, glass, 0, 0.92, -0.45);
-  box(1.78, 0.1, 2.08, paint, 0, 1.25, -0.45);
-  for (const x of [-0.85, 0.85]) for (const z of [0.5, -0.45, -1.42]) box(0.08, 0.56, 0.1, paint, x, 0.92, z);
-  box(1.6, 0.06, 1.6, dark, 0, 1.34, -0.5);
-  for (const x of [-0.78, 0.78]) box(0.05, 0.12, 1.7, dark, x, 1.38, -0.5);
-  box(0.5, 0.42, 0.32, new THREE.MeshLambertMaterial({ color: 0xb8892f }), 0.4, 1.58, -0.9);
-  box(1.95, 0.22, 0.22, chrome, 0, -0.05, 2.08);
-  box(1.95, 0.22, 0.22, chrome, 0, -0.05, -2.08);
-  box(1.3, 0.32, 0.06, dark, 0, 0.25, 2.02);
-  box(0.5, 0.2, 0.2, dark, 0, -0.04, 2.24);
-  for (const x of [-0.95, 0.95]) for (const z of [1.32, -1.28]) box(0.18, 0.12, 1.2, dark, x, 0.42, z);
-  const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.26, 14).rotateX(Math.PI / 2), dark);
-  spare.position.set(0, 0.5, -2.15); spare.castShadow = true; g.add(spare);
-  for (const x of [-0.62, 0.62]) {
-    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 12).rotateX(Math.PI / 2), lampMat);
-    l.position.set(x, 0.25, 2.04); g.add(l);
-    box(0.16, 0.12, 0.05, tailMat, x * 1.25, 0.3, -2.02);
-  }
-  const spots = [];
-  if (withLights) for (const x of [-0.62, 0.62]) {
-    const s = new THREE.SpotLight(0xfff1cf, 0, 75, 0.5, 0.55, 1.4);
-    s.position.set(x, 0.3, 2.1);
-    s.target.position.set(x * 2, -1.2, 24);
-    g.add(s, s.target); spots.push(s);
-  }
-  const wheelGeo = new THREE.CylinderGeometry(WR, WR, 0.32, 14).rotateZ(Math.PI / 2);
-  const hubGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.34, 8).rotateZ(Math.PI / 2);
-  const lugGeo = new THREE.BoxGeometry(0.34, 0.08, 0.5);
-  const wheels = WHEELS.map(w => {
-    const pivot = new THREE.Group(); pivot.position.set(w[0], w[1] - (REST - 0.1), w[2]);
-    const spin = new THREE.Group();
-    const tyre = new THREE.Mesh(wheelGeo, dark); tyre.castShadow = true;
-    spin.add(tyre, new THREE.Mesh(hubGeo, chrome), new THREE.Mesh(lugGeo, dark)); pivot.add(spin); g.add(pivot);
-    return { pivot, spin };
-  });
-  scene.add(g);
-  return { group: g, paint, wheels, spots, lampMat, tailMat };
-}
-const carMesh = buildCarMesh(true);
-
-const ropeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x1b1d1a }));
-ropeMesh.visible = false; scene.add(ropeMesh);
-
-const F = new V3(), T = new V3(), up = new V3(), fwd = new V3(), right = new V3(), off = new V3(), a = new V3(), foot = new V3(),
-  nrm = new V3(), r = new V3(), vp = new V3(), wf = new V3(), side = new V3(), tmp = new V3(), tmp2 = new V3(), qi = new THREE.Quaternion();
-const Yaxis = new V3(0, 1, 0);
-const ctl = { throttle: 0, brake: 0, handbrake: false };
-
-function addForceAt(f, rr) {
-  F.add(f);
-  T.x += rr.y * f.z - rr.z * f.y; T.y += rr.z * f.x - rr.x * f.z; T.z += rr.x * f.y - rr.y * f.x;
-}
-function pointVel(rr, out) {
-  const w = car.w;
-  return out.set(w.y * rr.z - w.z * rr.y, w.z * rr.x - w.x * rr.z, w.x * rr.y - w.y * rr.x).add(car.v);
-}
-
-function step(dt) {
-  const { p, v, q, w } = car;
-  F.set(0, -G * M, 0); T.set(0, 0, 0);
-  up.set(0, 1, 0).applyQuaternion(q); fwd.set(0, 0, 1).applyQuaternion(q); right.set(-1, 0, 0).applyQuaternion(q);
-  const speedF = v.dot(fwd), gear = car.low ? LOW : HIGH, th = ctl.throttle;
-  let drive = 0;
-  if (!car.stalled) {
-    if (th > 0) drive = th * gear.force * clamp(1 - Math.max(0, speedF) / gear.vmax, 0, 1);
-    else if (th < 0) drive = th * gear.force * 0.7 * clamp(1 - Math.max(0, -speedF) / gear.rev, 0, 1);
-  }
-  const hold = Math.abs(th) < 0.05 && Math.abs(speedF) < 1.2 && !ctl.brake;
-  const sc = Math.cos(car.steer), ss = Math.sin(car.steer), quarter = M / 4, wMu = 1 - 0.2 * weather.rain;
-  let grounded = 0;
-  for (let k = 0; k < 4; k++) {
-    const wh = car.wheel[k];
-    off.fromArray(WHEELS[k]).applyQuaternion(q); a.copy(p).add(off);
-    if (up.y < 0.12) { wh.comp = 0; wh.contact = false; wh.d = REST + WR; continue; }
-    foot.copy(a).addScaledVector(up, -(REST + WR * 0.6));
-    const hg = heightAt(foot.x, foot.z);
-    normalAt(foot.x, foot.z, nrm);
-    const surf = surfaceAt(foot.x, foot.z, nrm.y, hg);
-    const d = (a.y - (hg - surf.sink)) / up.y;
-    wh.d = d; wh.surf = surf; wh.depth = R.frozen ? 0 : R.wl - hg;
-    let comp = REST + WR - d;
-    if (comp <= 0) { wh.comp = 0; wh.contact = false; continue; }
-    comp = Math.min(comp, REST + 0.2);
-    const rate = (comp - wh.comp) / dt;
-    wh.comp = comp; wh.contact = true; grounded++;
-    let fn = K * comp + C * rate;
-    if (comp > REST) fn += (comp - REST) * K * 8;
-    fn = clamp(fn, 0, 90000);
-    r.copy(off).addScaledVector(up, -d);
-    wh.cp.copy(p).add(r);
-    addForceAt(tmp.copy(up).multiplyScalar(fn), r);
-    pointVel(r, vp);
-    if (k < 2) wf.copy(fwd).multiplyScalar(sc).addScaledVector(right, ss); else wf.copy(fwd);
-    wf.addScaledVector(nrm, -wf.dot(nrm)).normalize();
-    side.crossVectors(nrm, wf).normalize();
-    const vs = vp.dot(side), vl = vp.dot(wf);
-    const maxF = surf.mu * wMu * fn;
-    let fs = -vs * quarter / dt * 0.22;
-    let bk = ctl.brake * BRAKE / 4;
-    if (hold) bk = Math.max(bk, 8000);
-    if (ctl.handbrake && k >= 2) bk = Math.max(bk, 9000);
-    const d4 = drive / 4, resist = bk + surf.rr * fn, desired = -vl * quarter / dt * 0.4;
-    let fl = d4 + clamp(desired - d4, -resist, resist);
-    const tot = Math.hypot(fs, fl); let slip = 0;
-    if (tot > maxF) { const s = maxF / tot; fs *= s; fl *= s; slip = 1 - s; }
-    if (ctl.handbrake && k >= 2) fs *= 0.45;
-    r.addScaledVector(up, -r.dot(up) * 0.6);
-    addForceAt(tmp.copy(side).multiplyScalar(fs).addScaledVector(wf, fl), r);
-    wh.vl = vl; wh.slip = slip;
-    wh.spinV = (ctl.handbrake && k >= 2) ? 0 : vl / WR + (slip > 0.15 && drive !== 0 ? Math.sign(drive) * slip * 28 : 0);
-  }
-  for (const c of CORNERS) {
-    off.fromArray(c).applyQuaternion(q); a.copy(p).add(off);
-    const pen = heightAt(a.x, a.z) - a.y;
-    if (pen <= 0) continue;
-    normalAt(a.x, a.z, nrm); pointVel(off, vp);
-    const vn = vp.dot(nrm), fn = clamp(pen * 120000 - vn * 7000, 0, 150000);
-    tmp.copy(vp).addScaledVector(nrm, -vn);
-    const vt = tmp.length(), ff = Math.min(vt * quarter / dt * 0.3, 0.6 * fn);
-    if (vt > 1e-4) tmp.multiplyScalar(-ff / vt); else tmp.set(0, 0, 0);
-    addForceAt(tmp.addScaledVector(nrm, fn), off);
-  }
-  if (!R.frozen) {
-    const depth = R.wl - (p.y - 0.4);
-    if (depth > 0) {
-      const dd = Math.min(depth, 1.8);
-      F.addScaledVector(v, -dd * 700); F.y += dd * 4200;
-      w.multiplyScalar(1 - dd * 0.4 * dt);
-    }
-  }
-  if (car.winch) {
-    off.set(0, -0.05, 2.2).applyQuaternion(q); a.copy(p).add(off);
-    tmp.copy(car.winch.anchor).sub(a);
-    const dist = tmp.length(); tmp.divideScalar(dist || 1);
-    car.winch.dist = dist;
-    if (dist > car.winch.len) {
-      pointVel(off, vp);
-      const t = clamp((dist - car.winch.len) * 50000 - vp.dot(tmp) * 6000, 0, 36000);
-      car.winch.tension = t;
-      addForceAt(tmp.multiplyScalar(t), off);
-    } else car.winch.tension = 0;
-  }
-  F.addScaledVector(v, -v.length() * 0.55);
-  v.addScaledVector(F, dt / M);
-  qi.copy(q).invert();
-  tmp.copy(T).applyQuaternion(qi); tmp.x /= IX; tmp.y /= IY; tmp.z /= IZ; tmp.applyQuaternion(q);
-  w.addScaledVector(tmp, dt);
-  w.multiplyScalar(1 - (grounded ? 0.9 : 0.2) * dt);
-  p.addScaledVector(v, dt);
-  const wx = w.x * dt * 0.5, wy = w.y * dt * 0.5, wz = w.z * dt * 0.5;
-  const { x: qx, y: qy, z: qz, w: qw } = q;
-  q.set(qx + wx * qw + wy * qz - wz * qy, qy + wy * qw + wz * qx - wx * qz, qz + wz * qw + wx * qy - wy * qx, qw - wx * qx - wy * qy - wz * qz).normalize();
-  car.grounded = grounded;
-}
-
-function pushOut(cx, cz, ox, oz, rr) {
-  const dx = cx - ox, dz = cz - oz, d2 = dx * dx + dz * dz;
-  if (d2 >= rr * rr) return 0;
-  const d = Math.sqrt(d2) || 0.001, nx = dx / d, nz = dz / d, push = rr - d, v = car.v;
-  car.p.x += nx * push; car.p.z += nz * push;
-  const vn = v.x * nx + v.z * nz;
-  if (vn < 0) { v.x -= nx * vn * 1.25; v.z -= nz * vn * 1.25; car.w.y *= 0.7; }
-  return vn;
-}
-function collideObstacles() {
-  const p = car.p;
-  fwd.set(0, 0, 1).applyQuaternion(car.q);
-  for (const cz of [1.1, -1.1]) {
-    const cx = p.x + fwd.x * cz, czz = p.z + fwd.z * cz;
-    nearbyObstacles(cx, czz, o => {
-      if (p.y > o.y + o.h + 1.2) return;
-      if (pushOut(cx, czz, o.x, o.z, o.r + 1.15) < -7) thud();
-    });
-    for (const rc of remotes.values()) {
-      if (!rc.mesh.group.visible) continue;
-      const rp = rc.mesh.group.position;
-      if (Math.abs(rp.y - p.y) < 2.5 && pushOut(cx, czz, rp.x, rp.z, 2.3) < -5) thud();
-    }
-  }
-  p.x = clamp(p.x, -392, 392); p.z = clamp(p.z, -392, 392);
-}
-
-function yawOf(q) { tmp2.set(0, 0, 1).applyQuaternion(q); return Math.atan2(tmp2.x, tmp2.z); }
-function placeCar(x, z, yaw) {
-  car.p.set(x, heightAt(x, z) + 1.7, z);
-  car.q.setFromAxisAngle(Yaxis, yaw);
-  car.v.set(0, 0, 0); car.w.set(0, 0, 0);
-  car.stalled = false; car.winch = null; car.flipT = 0; car.steer = 0;
-  car.wheel.forEach(w => { w.comp = 0; w.contact = false; });
-  car.safe.copy(car.p); car.safeYaw = yaw;
-}
-function placeAtStart() {
-  // Spread drivers sideways on the start pad so they don't spawn inside each other.
-  const yaw = routeYaw(R), slot = net.online ? (net.id % 4) - 1.5 : 0;
-  placeCar(R.start[0] + Math.cos(yaw) * slot * 4, R.start[1] - Math.sin(yaw) * slot * 4, yaw);
-}
-function recover() {
-  const inWater = !R.frozen && heightAt(car.p.x, car.p.z) < R.wl + 0.3;
-  if (inWater || car.stalled) placeCar(car.safe.x, car.safe.z, car.safeYaw);
-  else placeCar(car.p.x, car.p.z, yawOf(car.q));
-  toast('Vehicle recovered.');
-}
-
-/* ---------- Particles ---------- */
-const PCOUNT = 420;
-const particles = (() => {
-  const g = new THREE.BufferGeometry();
-  const pos = new Float32Array(PCOUNT * 3), col = new Float32Array(PCOUNT * 3), alpha = new Float32Array(PCOUNT), size = new Float32Array(PCOUNT);
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('pcolor', new THREE.BufferAttribute(col, 3));
-  g.setAttribute('alpha', new THREE.BufferAttribute(alpha, 1));
-  g.setAttribute('psize', new THREE.BufferAttribute(size, 1));
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: 'attribute vec3 pcolor; attribute float alpha; attribute float psize; varying vec3 vC; varying float vA; void main(){ vC = pcolor; vA = alpha; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = psize * (320.0 / -mv.z); gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'varying vec3 vC; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(vC, vA * (1.0 - d * 2.0)); }',
-    transparent: true, depthWrite: false,
-  });
-  const pts = new THREE.Points(g, mat); pts.frustumCulled = false; scene.add(pts);
-  const life = new Float32Array(PCOUNT), vel = new Float32Array(PCOUNT * 3);
-  let next = 0;
-  return {
-    emit(x, y, z, vx, vy, vz, c, s) {
-      const i = next; next = (next + 1) % PCOUNT;
-      pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-      vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz;
-      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-      life[i] = 1; size[i] = s;
-    },
-    update(dt) {
-      for (let i = 0; i < PCOUNT; i++) {
-        if (life[i] <= 0) { alpha[i] = 0; continue; }
-        life[i] -= dt * 0.8;
-        vel[i * 3 + 1] -= dt * 1.5;
-        for (let k = 0; k < 3; k++) { pos[i * 3 + k] += vel[i * 3 + k] * dt; vel[i * 3 + k] *= 1 - dt * 1.4; }
-        size[i] += dt * 1.6;
-        alpha[i] = Math.max(0, life[i]) * 0.55;
-      }
-      for (const n of ['position', 'pcolor', 'alpha', 'psize']) g.attributes[n].needsUpdate = true;
-    },
-  };
-})();
-const pColor = new THREE.Color();
-function surfaceDustColor(s) {
-  if (s === SURF.mud || s === SURF.sand) return pColor.set(R.patchC).multiplyScalar(1.15);
-  if (s === SURF.snow || s === SURF.ice) return pColor.set('#f5f9fb');
-  if (s === SURF.rock) return pColor.set('#b4ab9c');
-  return pColor.set(R.dust);
-}
-function emitWheelParticles(dt) {
-  for (const wh of car.wheel) {
-    if (!wh.contact) continue;
-    const spd = Math.abs(wh.vl);
-    if (wh.depth > 0.05 && spd > 1.5) {
-      if (Math.random() < dt * spd * 3) particles.emit(wh.cp.x, R.wl + 0.1, wh.cp.z, (Math.random() - .5) * 3, 2 + Math.random() * 2, (Math.random() - .5) * 3, pColor.set('#dfeef0'), 0.5);
-      continue;
-    }
-    const kick = spd > 6 ? (spd - 6) * 0.6 : 0, spinning = wh.slip > 0.2 ? 8 : 0;
-    if (Math.random() < dt * (kick + spinning)) {
-      particles.emit(wh.cp.x, wh.cp.y + 0.15, wh.cp.z, -fwd.x * 1.5 + (Math.random() - .5) * 1.5, 0.8 + Math.random(), -fwd.z * 1.5 + (Math.random() - .5) * 1.5, surfaceDustColor(wh.surf), 0.7);
-    }
-  }
-}
-
-/* ---------- Weather ---------- */
-const weather = { rain: 0, target: 0, timer: 70, kind: 'rain' };
-const RAIN_N = 2400;
-const rainGeo = new THREE.BufferGeometry();
-const rainPos = new Float32Array(RAIN_N * 3);
-for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - .5) * 60; rainPos[i * 3 + 1] = (Math.random() - .5) * 30; rainPos[i * 3 + 2] = (Math.random() - .5) * 60; }
-rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-const rainMat = new THREE.PointsMaterial({ color: 0xdfe8ee, size: 0.09, transparent: true, opacity: 0, depthWrite: false });
-const rain = new THREE.Points(rainGeo, rainMat); rain.frustumCulled = false; scene.add(rain);
-function updateWeather(dt) {
-  weather.timer -= dt;
-  if (weather.timer <= 0) { weather.timer = 90 + Math.random() * 90; weather.target = Math.random() < R.rainChance ? 1 : 0; }
-  weather.rain += clamp(weather.target - weather.rain, -dt / 20, dt / 20);
-  rain.visible = weather.rain > 0.02;
-  rainMat.opacity = weather.rain * 0.75;
-  if (!rain.visible) return;
-  const snow = weather.kind === 'snow', fall = snow ? 3 : 24;
-  for (let i = 0; i < RAIN_N; i++) {
-    rainPos[i * 3 + 1] -= fall * dt;
-    if (snow) rainPos[i * 3] += Math.sin(i + performance.now() * 0.0007) * dt * 0.8;
-    if (rainPos[i * 3 + 1] < -15) rainPos[i * 3 + 1] += 30;
-  }
-  rainGeo.attributes.position.needsUpdate = true;
-  rain.position.copy(camera.position);
-}
-
-/* ---------- Sky & time ---------- */
-const DAY = 720;
-const sky = { t: 0.3, night: 0 };
-const cNightTop = new THREE.Color('#0a1226'), cNightHor = new THREE.Color('#1c2639'), cDuskTop = new THREE.Color('#4a5f8a'), cDuskHor = new THREE.Color('#e8975c'),
-  cDayTop = new THREE.Color(), cDayHor = new THREE.Color(), cGrey = new THREE.Color(), skyTop = new THREE.Color(), skyHor = new THREE.Color();
-const sunDir = new V3(), lightDir = new V3();
-function updateSky(dt) {
-  if (!state.photo) sky.t = (sky.t + dt / DAY) % 1;
-  const ang = (sky.t - 0.25) * Math.PI * 2, elev = Math.sin(ang), az = Math.cos(ang);
-  const day = smooth(-0.1, 0.3, elev), dusk = elev > -0.15 ? Math.max(0, 1 - Math.abs(elev) / 0.28) : 0, wr = weather.rain;
-  cDayTop.set(R.skyDay[0]); cDayHor.set(R.skyDay[1]);
-  skyTop.copy(cNightTop).lerp(cDayTop, day).lerp(cDuskTop, dusk * 0.5);
-  skyHor.copy(cNightHor).lerp(cDayHor, day).lerp(cDuskHor, dusk * 0.65);
-  cGrey.set('#8d969b').multiplyScalar(0.25 + 0.75 * day);
-  skyTop.lerp(cGrey, wr * 0.65); skyHor.lerp(cGrey, wr * 0.6);
-  skyMat.uniforms.top.value.copy(skyTop); skyMat.uniforms.bottom.value.copy(skyHor);
-  scene.fog.color.copy(skyHor);
-  scene.fog.far = lerp(430, 150, wr); scene.fog.near = lerp(70, 22, wr);
-  sunDir.set(az * 0.85, elev, 0.42).normalize();
-  const isDay = elev > -0.05;
-  lightDir.copy(sunDir); if (!isDay) lightDir.negate();
-  sun.position.copy(car.p).addScaledVector(lightDir, 180);
-  sun.target.position.copy(car.p);
-  if (isDay) { sun.color.set('#ffb070').lerp(_c1.set('#fff6e6'), smooth(0, 0.4, elev)); sun.intensity = lerp(0.25, 1.0, day) * (1 - 0.45 * wr); }
-  else { sun.color.set('#9fb4dc'); sun.intensity = 0.3 * (1 - 0.5 * wr); }
-  hemi.color.copy(skyTop).lerp(_c1.set('#ffffff'), 0.35);
-  hemi.intensity = 0.32 + 0.38 * day;
-  skyDome.position.copy(camera.position);
-  sunDisc.position.copy(camera.position).addScaledVector(sunDir, 900); sunDisc.lookAt(camera.position);
-  moonDisc.position.copy(camera.position).addScaledVector(sunDir, -900); moonDisc.lookAt(camera.position);
-  sunDisc.visible = elev > -0.06 && wr < 0.7; moonDisc.visible = elev < 0.06 && wr < 0.7;
-  sunDisc.material.color.set('#ffd9a0').lerp(_c1.set('#fff8ea'), smooth(0, 0.3, elev));
-  stars.position.copy(camera.position);
-  stars.material.opacity = (1 - day) * (1 - wr) * 0.9;
-  sky.night = 1 - day;
-}
-
-/* ---------- State, input, camera ---------- */
-const state = { started: false, map: 0, loadedMap: -1, photo: false, finished: false, bigmap: false, t0: 0, elapsed: 0,
-  paint: 0, camMode: 0, lights: false, lightsAuto: true, muted: false, showKeys: true, localResults: {} };
-const keys = {}, touchIn = { left: 0, right: 0, gas: 0, brake: 0 };
-const cam = { yaw: 0, pitch: 0.3, dist: 9.5, lastDrag: 0, yawS: 0, orbit: 0, photoBase: 0 };
-const gp = { steer: 0, gas: 0, brake: 0, prev: [] };
-
-function setBigMap(on) { state.bigmap = on; $('#bigmap').hidden = !on; }
-function press(code) {
-  if (!state.started) { if (code === 'Enter') start(); return; }
-  if (state.finished) { if (code === 'Enter') driveAgain(); return; }
-  switch (code) {
-    case 'KeyL': {
-      const sp = Math.abs(car.v.dot(fwd.set(0, 0, 1).applyQuaternion(car.q)));
-      if (sp > 2.5) { toast('Slow below 9 km/h to shift the transfer case.'); break; }
-      car.low = !car.low;
-      toast(car.low ? '4L: low range. More pulling power, top speed 40 km/h.' : '4H: high range. Fast, less pulling power.');
-      clunk(); break;
-    }
-    case 'KeyE': toggleWinch(); break;
-    case 'KeyM': setBigMap(!state.bigmap); break;
-    case 'KeyH': state.lightsAuto = false; state.lights = !state.lights; break;
-    case 'KeyR': recover(); break;
-    case 'KeyC': state.camMode = (state.camMode + 1) % 2; break;
-    case 'KeyV': state.paint = (state.paint + 1) % PAINTS.length; carMesh.paint.color.set(PAINTS[state.paint][1]); toast('Paint: ' + PAINTS[state.paint][0]); break;
-    case 'KeyP':
-      state.photo = !state.photo;
-      cam.photoBase = cam.yawS - cam.yaw;
-      $('#hud').hidden = state.photo; $('#photoHint').hidden = !state.photo; $('#touch').hidden = state.photo || !isTouch;
-      if (state.photo) setBigMap(false);
-      break;
-    case 'KeyN': state.muted = !state.muted; if (audio.master) audio.master.gain.value = state.muted ? 0 : 0.32; toast(state.muted ? 'Sound off.' : 'Sound on.'); break;
-    case 'KeyK': state.showKeys = !state.showKeys; $('#keys').hidden = !state.showKeys; break;
-    case 'BracketLeft': if (state.photo) sky.t = (sky.t + 1 - 1 / 48) % 1; break;
-    case 'BracketRight': if (state.photo) sky.t = (sky.t + 1 / 48) % 1; break;
-    case 'Escape': setBigMap(false); break;
-  }
-}
-addEventListener('keydown', e => {
-  if (e.target && e.target.tagName === 'INPUT') { if (e.code === 'Enter') { e.target.blur(); press('Enter'); } return; }
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
-  keys[e.code] = true;
-  if (!e.repeat) press(e.code);
-});
-addEventListener('keyup', e => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-
-let drag = null;
-canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointermove', e => {
-  if (!drag || drag.id !== e.pointerId) return;
-  cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - drag.y) * 0.004, 0.04, 1.25);
-  drag.x = e.clientX; drag.y = e.clientY; cam.lastDrag = performance.now();
-});
-const endDrag = () => { drag = null; };
-canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-canvas.addEventListener('wheel', e => { e.preventDefault(); cam.dist = clamp(cam.dist * (1 + Math.sign(e.deltaY) * 0.1), 5, 24); }, { passive: false });
-
-const isTouch = matchMedia('(pointer: coarse)').matches;
-if (isTouch) document.body.classList.add('touch');
-document.querySelectorAll('#touch [data-hold]').forEach(b => {
-  const k = b.dataset.hold;
-  const on = e => { e.preventDefault(); touchIn[k] = 1; b.classList.add('down'); if (b.setPointerCapture) b.setPointerCapture(e.pointerId); };
-  const offF = () => { touchIn[k] = 0; b.classList.remove('down'); };
-  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', offF); b.addEventListener('pointercancel', offF); b.addEventListener('lostpointercapture', offF);
-});
-document.querySelectorAll('#touch [data-tap]').forEach(b => b.addEventListener('click', () => press(b.dataset.tap)));
-$('#miniWrap').addEventListener('click', () => press('KeyM'));
-$('#bigmap').addEventListener('click', () => setBigMap(false));
-
-function pollGamepad(dt) {
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const g = pads && pads[0];
-  if (!g) { gp.steer = gp.gas = gp.brake = 0; return; }
-  let s = g.axes[0] || 0; if (Math.abs(s) < 0.12) s = 0; gp.steer = s;
-  gp.gas = g.buttons[7] ? g.buttons[7].value : 0; gp.brake = g.buttons[6] ? g.buttons[6].value : 0;
-  const map = { 0: 'KeyE', 1: 'KeyL', 2: 'KeyH', 3: 'KeyR', 4: 'KeyC', 5: 'KeyV', 8: 'KeyM', 9: 'KeyP' };
-  for (const b in map) { const pr = !!(g.buttons[b] && g.buttons[b].pressed); if (pr && !gp.prev[b]) press(state.started && !state.finished ? map[b] : 'Enter'); gp.prev[b] = pr; }
-  const rx = g.axes[2] || 0, ry = g.axes[3] || 0;
-  if (Math.abs(rx) > 0.15 || Math.abs(ry) > 0.15) { cam.yaw -= rx * dt * 2.2; cam.pitch = clamp(cam.pitch + ry * dt * 1.5, 0.04, 1.25); cam.lastDrag = performance.now(); }
-}
-
-function updateControls(dt) {
-  const speedF = car.v.dot(fwd.set(0, 0, 1).applyQuaternion(car.q));
-  const live = state.started && !state.finished;
-  const gas = live ? Math.max(keys.KeyW || keys.ArrowUp ? 1 : 0, touchIn.gas, gp.gas) : 0;
-  const back = live ? Math.max(keys.KeyS || keys.ArrowDown ? 1 : 0, touchIn.brake, gp.brake) : 0;
-  let st = live ? ((keys.KeyD || keys.ArrowRight || touchIn.right) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft || touchIn.left) ? 1 : 0) + gp.steer : 0;
-  st = clamp(st, -1, 1);
-  ctl.throttle = 0; ctl.brake = state.finished ? 1 : 0;
-  if (gas > 0) { if (speedF < -1.5) ctl.brake = gas; else ctl.throttle = gas; }
-  if (back > 0) { if (speedF > 1.5) ctl.brake = Math.max(ctl.brake, back); else ctl.throttle = -back; }
-  ctl.handbrake = live && !!keys.Space;
-  const maxSteer = 0.6 / (1 + Math.abs(speedF) * 0.07);
-  car.steer += clamp(st * maxSteer - car.steer, -2.4 * dt, 2.4 * dt);
-}
-
-const camPos = new V3(), camTarget = new V3(), qFlip = new THREE.Quaternion().setFromAxisAngle(Yaxis, Math.PI), qTilt = new THREE.Quaternion().setFromAxisAngle(new V3(1, 0, 0), -0.08);
-function updateCamera(dt, now) {
-  camTarget.copy(car.p).y += 1.0;
-  if (!state.started) {
-    cam.orbit += dt * 0.06;
-    camPos.set(car.p.x + Math.sin(cam.orbit) * 13, car.p.y + 4.2, car.p.z + Math.cos(cam.orbit) * 13);
-    camera.position.copy(camPos); camera.lookAt(camTarget.x - Math.cos(cam.orbit) * 3, camTarget.y, camTarget.z + Math.sin(cam.orbit) * 3);
-    return;
-  }
-  if (state.camMode === 1 && !state.photo) {
-    up.set(0, 1, 0).applyQuaternion(car.q); fwd.set(0, 0, 1).applyQuaternion(car.q);
-    camera.position.copy(car.p).addScaledVector(up, 1.08).addScaledVector(fwd, 0.35);
-    camera.quaternion.copy(car.q).multiply(qFlip).multiply(qTilt);
-    return;
-  }
-  const heading = yawOf(car.q);
-  if (!state.photo && now - cam.lastDrag > 2500 && car.v.length() > 2) cam.yaw *= 1 - Math.min(1, 1.6 * dt);
-  if (state.photo) cam.yawS = cam.photoBase + cam.yaw;
-  else cam.yawS += wrapAngle(heading + cam.yaw - cam.yawS) * (1 - Math.exp(-3.5 * dt));
-  const dist = cam.dist + clamp(car.v.length() - 15, 0, 25) * 0.12;
-  const cp = Math.cos(cam.pitch) * dist;
-  camPos.set(camTarget.x - Math.sin(cam.yawS) * cp, camTarget.y + Math.sin(cam.pitch) * dist + 0.6, camTarget.z - Math.cos(cam.yawS) * cp);
-  camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 1.2);
-  camera.position.lerp(camPos, 1 - Math.exp(-9 * dt));
-  camera.lookAt(camTarget);
-}
-
-/* ---------- Gameplay ---------- */
-function toggleWinch() {
-  if (car.winch) { car.winch = null; toast('Winch released.'); return; }
-  fwd.set(0, 0, 1).applyQuaternion(car.q);
-  a.copy(car.p).addScaledVector(fwd, 2.2);
-  let best = null, bd = 25;
-  nearbyObstacles(a.x, a.z, o => {
-    if (o.kind !== 'tree' && o.kind !== 'rock') return;
-    if (o.kind === 'rock' && o.r < 1.4) return;
-    const d = Math.hypot(o.x - a.x, o.z - a.z);
-    if (d < bd) { bd = d; best = o; }
-  });
-  if (!best) { toast('No tree or boulder within 25 m to anchor the winch.'); return; }
-  const anchor = new V3(best.x, best.y + 0.8, best.z);
-  car.winch = { anchor, len: a.distanceTo(anchor), tension: 0, dist: a.distanceTo(anchor) };
-  toast(`Winch line on ${best.kind === 'tree' ? 'a tree' : 'a boulder'}, ${Math.round(car.winch.len)} m out. Reeling in.`);
-  clunk();
-}
-function updateWinch(dt) {
-  if (!car.winch) { ropeMesh.visible = false; return; }
-  const w = car.winch;
-  w.len = Math.max(3.5, w.len - 1.6 * dt, (w.dist || w.len) - 1.2);
-  if (w.len <= 3.6 && w.dist < 4.6) { car.winch = null; ropeMesh.visible = false; toast('Winch fully reeled in and released.'); return; }
-  off.set(0, -0.05, 2.2).applyQuaternion(car.q); a.copy(car.p).add(off);
-  ropeMesh.visible = true; ropeMesh.position.copy(a);
-  ropeMesh.scale.set(1, 1, a.distanceTo(w.anchor)); ropeMesh.lookAt(w.anchor);
-}
-
-const cairnsFound = () => cairns.filter(c => c.found).length;
-function checkObjectives(now) {
-  for (const c of cairns) {
-    if (c.found) continue;
-    if (Math.hypot(car.p.x - c.x, car.p.z - c.z) < 7.5) {
-      c.found = true; c.flagMat.color.set('#f1ead9');
-      chime();
-      toast(`Bonus cairn ${cairnsFound()} of ${cairns.length} logged.`);
-    }
-  }
-  if (!state.finished && Math.hypot(car.p.x - R.end[0], car.p.z - R.end[1]) < 7) finish(now);
-}
-function finish(now) {
-  state.finished = true;
-  state.elapsed = (now - state.t0) / 1000;
-  car.winch = null; setBigMap(false);
-  const entry = { name: playerName(), time: state.elapsed, cairns: cairnsFound(), me: true };
-  if (net.online) sendNet({ t: 'finish', m: state.map, time: state.elapsed, cairns: entry.cairns });
-  const list = state.localResults[state.map] || (state.localResults[state.map] = []);
-  list.push(entry); list.sort((x, y) => x.time - y.time);
-  chime(); setTimeout(chime, 300);
-  $('#resMap').textContent = R.name;
-  $('#resTime').textContent = fmtTime(state.elapsed);
-  $('#resNote').textContent = `${entry.cairns} of ${cairns.length} bonus cairns logged on the way.`;
-  renderResults();
-  $('#results').hidden = false;
-  $('#touch').hidden = true;
-  setTimeout(() => $('#againBtn').focus(), 50);
-}
-function renderResults() {
-  const online = net.online && net.results[state.map];
-  const list = online ? net.results[state.map] : (state.localResults[state.map] || []);
-  $('#resBoardLabel').textContent = online ? 'Fastest on this network' : 'Your times this session';
-  const me = playerName();
-  $('#resBoard').innerHTML = list.slice(0, 8).map((e, i) =>
-    `<tr class="${(online ? e.name === me && Math.abs(e.time - state.elapsed) < 0.05 : e.me && e.time === state.elapsed) ? 'me' : ''}"><td>${i + 1}</td><td>${esc(e.name)}</td><td>${fmtTime(e.time)}</td><td>${e.cairns}</td></tr>`).join('') ||
-    '<tr><td colspan="4">No times yet.</td></tr>';
-}
-function driveAgain() {
-  $('#results').hidden = true;
-  buildRegion(null);
-  beginRun();
-}
-function backToMaps() {
-  $('#results').hidden = true; $('#hud').hidden = true; $('#touch').hidden = true; setBigMap(false);
-  state.started = false; state.finished = false;
-  buildRegion(null); placeAtStart();
-  $('#title').hidden = false;
-  updateNetStatus();
-}
-$('#againBtn').addEventListener('click', driveAgain);
-$('#mapsBtn').addEventListener('click', backToMaps);
-
-/* ---------- Audio ---------- */
-const audio = {};
-function initAudio() {
-  if (audio.ctx) return;
-  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-  const ctx = new AC(); audio.ctx = ctx;
-  audio.master = ctx.createGain(); audio.master.gain.value = state.muted ? 0 : 0.32; audio.master.connect(ctx.destination);
-  audio.o1 = ctx.createOscillator(); audio.o1.type = 'sawtooth';
-  audio.o2 = ctx.createOscillator(); audio.o2.type = 'square';
-  audio.filt = ctx.createBiquadFilter(); audio.filt.type = 'lowpass'; audio.filt.frequency.value = 400;
-  audio.eng = ctx.createGain(); audio.eng.gain.value = 0.1;
-  const sub = ctx.createGain(); sub.gain.value = 0.45;
-  audio.o1.connect(audio.filt); audio.o2.connect(sub); sub.connect(audio.filt); audio.filt.connect(audio.eng); audio.eng.connect(audio.master);
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-  audio.bp = ctx.createBiquadFilter(); audio.bp.type = 'bandpass'; audio.bp.frequency.value = 900; audio.bp.Q.value = 0.6;
-  audio.noise = ctx.createGain(); audio.noise.gain.value = 0;
-  src.connect(audio.bp); audio.bp.connect(audio.noise); audio.noise.connect(audio.master);
-  audio.o1.start(); audio.o2.start(); src.start();
-}
-function updateAudio() {
-  if (!audio.ctx) return;
-  const t = audio.ctx.currentTime, gear = car.low ? LOW : HIGH;
-  const sp = Math.abs(car.v.dot(fwd.set(0, 0, 1).applyQuaternion(car.q)));
-  const slip = Math.max(...car.wheel.map(w => w.slip));
-  const rpm = car.stalled ? 0 : 0.18 + clamp(sp / gear.vmax, 0, 1) * 0.7 + Math.abs(ctl.throttle) * (0.12 + slip * 0.3);
-  const f = 30 + rpm * 82;
-  audio.o1.frequency.setTargetAtTime(f, t, 0.06); audio.o2.frequency.setTargetAtTime(f * 0.5, t, 0.06);
-  audio.filt.frequency.setTargetAtTime(220 + rpm * 900, t, 0.08);
-  audio.eng.gain.setTargetAtTime(car.stalled || !state.started ? 0.03 : 0.08 + Math.abs(ctl.throttle) * 0.1, t, 0.1);
-  audio.noise.gain.setTargetAtTime(Math.min(0.3, weather.rain * 0.18 + car.v.length() * 0.004), t, 0.2);
-}
-function blip(freq, dur, type, vol) {
-  if (!audio.ctx) return;
-  const ctx = audio.ctx, o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = type; o.frequency.value = freq; g.gain.value = vol;
-  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
-  o.connect(g); g.connect(audio.master); o.start(); o.stop(ctx.currentTime + dur);
-}
-const clunk = () => blip(70, 0.18, 'square', 0.25);
-let lastThud = 0;
-const thud = () => { const n = performance.now(); if (n - lastThud > 400) { lastThud = n; blip(48, 0.3, 'sine', 0.6); } };
-const chime = () => { blip(660, 0.5, 'triangle', 0.2); setTimeout(() => blip(990, 0.7, 'triangle', 0.16), 140); };
-
-/* ---------- Multiplayer (same Wi-Fi, via server.js) ---------- */
-const net = { ws: null, id: 0, online: false, roster: [], results: {}, sendT: 0, available: /^https?:$/.test(location.protocol) && !/claude/i.test(location.hostname) };
-const remotes = new Map();
-function storage(fn) { try { return fn(window.localStorage); } catch (_) { return null; } }
-const nameInput = $('#playerName');
-nameInput.value = storage(s => s.getItem('lowrange-name')) || 'Driver ' + Math.floor(100 + Math.random() * 900);
-nameInput.addEventListener('change', () => {
-  nameInput.value = nameInput.value.trim().slice(0, 16) || 'Driver';
-  storage(s => s.setItem('lowrange-name', nameInput.value));
-  if (net.online) sendNet({ t: 'hello', name: playerName() });
-});
-const playerName = () => (nameInput.value.trim() || 'Driver').slice(0, 16);
-
-function sendNet(obj) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(obj)); }
-function netConnect() {
-  if (!net.available) { updateNetStatus(); return; }
-  let ws;
-  try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (_) { updateNetStatus(); return; }
-  net.ws = ws;
-  ws.onopen = () => { net.online = true; sendNet({ t: 'hello', name: playerName() }); updateNetStatus(); };
-  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } onNet(m); };
-  ws.onclose = () => {
-    const was = net.online;
-    net.online = false; net.ws = null; net.roster = [];
-    for (const id of [...remotes.keys()]) removeRemote(id);
-    updateNetStatus();
-    if (was) toast('Lost the connection to the Low Range server. Retrying.');
-    setTimeout(netConnect, 3000);
-  };
-}
-function onNet(m) {
-  switch (m.t) {
-    case 'welcome':
-      net.id = m.id; net.results = m.results || {};
-      if (!state.started && Number.isInteger(m.map) && m.map !== state.map) selectMap(m.map, false);
-      break;
-    case 'roster': net.roster = m.players || []; updateNetStatus(); break;
-    case 'map':
-      if (!state.started && Number.isInteger(m.m) && m.m !== state.map) { selectMap(m.m, false); updateNetStatus(`${esc(m.by)} picked ${REGIONS[m.m].name}.`); }
-      break;
-    case 's': if (m.id !== net.id) updateRemote(m); break;
-    case 'leave': removeRemote(m.id); break;
-    case 'results':
-      net.results[m.m] = m.list;
-      if (state.finished && m.m === state.map) renderResults();
-      if (m.who !== net.id && state.started) toast(`${m.name} finished ${REGIONS[m.m].name} in ${fmtTime(m.time)}.`);
-      break;
-  }
-}
-function updateNetStatus(extra) {
-  const el = $('#netStatus'), hud = $('#hudNet');
-  if (net.online) {
-    const names = net.roster.map(p => esc(p.name)).join(', ');
-    el.innerHTML = `<b>On your Wi-Fi.</b> ${net.roster.length} driver${net.roster.length === 1 ? '' : 's'} connected: ${names}. Everyone who picks the same map drives together.${extra ? ' ' + extra : ''}`;
-    hud.textContent = `LAN · ${net.roster.length}`;
-  } else if (net.available) {
-    el.textContent = 'Looking for the Low Range server on this network…';
-    hud.textContent = 'Solo';
-  } else {
-    el.textContent = 'Solo. To drive with friends on the same Wi-Fi, start server.js on one computer and open its address on every device.';
-    hud.textContent = 'Solo';
-  }
-}
-function makeTag(name) {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
-  const x = c.getContext('2d');
-  x.fillStyle = 'rgba(20,26,21,0.78)'; x.fillRect(8, 8, 240, 48);
-  x.fillStyle = '#f1ead9'; x.font = '600 30px "Barlow Semi Condensed", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText(name, 128, 33);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false, fog: false }));
-  s.scale.set(3.4, 0.85, 1); s.position.y = 2.7;
-  return s;
-}
-function updateRemote(m) {
-  let rc = remotes.get(m.id);
-  if (!Array.isArray(m.p) || !Array.isArray(m.q)) return;
-  if (!rc) {
-    const mesh = buildCarMesh(false);
-    rc = { mesh, name: '', p: new V3().fromArray(m.p), q: new THREE.Quaternion().fromArray(m.q), tag: null, last: 0, map: m.m, lights: false, steer: 0 };
-    mesh.group.position.copy(rc.p); mesh.group.quaternion.copy(rc.q);
-    remotes.set(m.id, rc);
-  }
-  if (m.n !== rc.name) {
-    if (rc.tag) { rc.mesh.group.remove(rc.tag); rc.tag.material.map.dispose(); rc.tag.material.dispose(); }
-    rc.name = m.n; rc.tag = makeTag(m.n); rc.mesh.group.add(rc.tag);
-  }
-  rc.p.fromArray(m.p); rc.q.fromArray(m.q); rc.map = m.m; rc.last = performance.now();
-  rc.mesh.paint.color.set(PAINTS[(m.c | 0) % PAINTS.length][1]);
-  rc.lights = !!m.l; rc.steer = +m.s || 0; rc.finished = !!m.f;
-}
-function removeRemote(id) {
-  const rc = remotes.get(id); if (!rc) return;
-  scene.remove(rc.mesh.group);
-  rc.mesh.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
-  remotes.delete(id);
-}
-function updateRemotes(dt, now) {
-  const k = 1 - Math.exp(-10 * dt);
-  for (const rc of remotes.values()) {
-    const g = rc.mesh.group;
-    g.visible = rc.map === state.map && now - rc.last < 5000;
-    if (!g.visible) continue;
-    g.position.lerp(rc.p, k); g.quaternion.slerp(rc.q, k);
-    rc.mesh.wheels[0].pivot.rotation.y = rc.mesh.wheels[1].pivot.rotation.y = -rc.steer;
-    rc.mesh.lampMat.color.set(rc.lights ? 0xfff4d2 : 0x8a8576);
-  }
-}
-function netSend(now) {
-  if (!net.online || !state.started || now - net.sendT < 66) return;
-  net.sendT = now;
-  const rd = v => Math.round(v * 100) / 100;
-  sendNet({ t: 's', m: state.map, n: playerName(), p: car.p.toArray().map(rd), q: car.q.toArray().map(v => Math.round(v * 10000) / 10000),
-    c: state.paint, l: lightsOn(), s: rd(car.steer), f: state.finished });
-}
-
-/* ---------- HUD ---------- */
-let toastTimer = 0;
-function toast(text, ms = 3000) {
-  const el = $('#toast'); el.textContent = text; el.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms);
-}
-const compass = $('#compass'), cctx = compass.getContext('2d');
-const mapC = $('#map'), mctx = mapC.getContext('2d');
-const bigC = $('#bigmapC'), bctx = bigC.getContext('2d');
-function sizeCompass() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  compass.width = Math.max(1, compass.clientWidth * dpr); compass.height = Math.max(1, compass.clientHeight * dpr);
-}
-const camDir = new V3();
-function drawCompass() {
-  const w = compass.width, h = compass.height; if (w < 2) return;
-  const dpr = w / Math.max(1, compass.clientWidth);
-  cctx.clearRect(0, 0, w, h);
-  cctx.fillStyle = 'rgba(20,26,21,0.76)'; cctx.fillRect(0, 0, w, h);
-  camera.getWorldDirection(camDir);
-  const heading = (Math.atan2(camDir.x, -camDir.z) * 180 / Math.PI + 360) % 360;
-  const span = 150, ppd = w / span, labels = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
-  cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
-  for (let d = Math.floor((heading - span / 2) / 5) * 5; d <= heading + span / 2; d += 5) {
-    const x = w / 2 + (d - heading) * ppd, dd = ((d % 360) + 360) % 360;
-    if (labels[dd] !== undefined) {
-      cctx.fillStyle = dd === 0 ? '#f0a53a' : '#f1ead9';
-      cctx.font = `600 ${12 * dpr}px "Overpass Mono", monospace`; cctx.fillText(labels[dd], x, h * 0.42);
-    } else {
-      cctx.fillStyle = 'rgba(241,234,217,0.5)';
-      const th = dd % 15 === 0 ? h * 0.32 : h * 0.16;
-      cctx.fillRect(x - dpr * 0.5, h - th, dpr, th);
-    }
-  }
-  const mark = (x, z, color, label) => {
-    const dx = x - car.p.x, dz = z - car.p.z, dist = Math.hypot(dx, dz);
-    const b = Math.atan2(dx, -dz) * 180 / Math.PI;
-    let rel = ((b - heading + 540) % 360) - 180;
-    const offscreen = Math.abs(rel) > span / 2 - 4;
-    if (offscreen && !label) return;
-    rel = clamp(rel, -span / 2 + 4, span / 2 - 4);
-    const px = w / 2 + rel * ppd;
-    cctx.fillStyle = color;
-    cctx.beginPath(); cctx.moveTo(px, h * 0.08); cctx.lineTo(px + 5 * dpr, h * 0.22); cctx.lineTo(px, h * 0.36); cctx.lineTo(px - 5 * dpr, h * 0.22); cctx.fill();
-    cctx.font = `400 ${9.5 * dpr}px "Overpass Mono", monospace`;
-    cctx.fillText(label ? `${label} ${Math.round(dist)} m` : `${Math.round(dist)} m`, px, h * 0.8);
-  };
-  for (const c of cairns) if (!c.found && Math.hypot(c.x - car.p.x, c.z - car.p.z) < 260) mark(c.x, c.z, '#e8742f');
-  mark(R.end[0], R.end[1], '#cf5d33', 'FINISH');
-  cctx.fillStyle = '#f0a53a'; cctx.fillRect(w / 2 - dpr, 0, dpr * 2, h * 0.14);
-}
-function drawMapTo(ctx, S, big, now) {
-  ctx.drawImage(mapImage, 0, 0, S, S);
-  const k = S / 300, toPx = v => (v + HALF) / SIZE * S;
-  if (big) {
-    ctx.setLineDash([8 * k, 8 * k]); ctx.strokeStyle = 'rgba(241,234,217,.55)'; ctx.lineWidth = 2 * k;
-    ctx.beginPath(); ctx.moveTo(toPx(R.start[0]), toPx(R.start[1])); ctx.lineTo(toPx(R.end[0]), toPx(R.end[1])); ctx.stroke(); ctx.setLineDash([]);
-  }
-  for (const c of cairns) if (c.found) { ctx.fillStyle = '#f1ead9'; ctx.beginPath(); ctx.arc(toPx(c.x), toPx(c.z), 4.5 * k, 0, 7); ctx.fill(); }
-  const pin = (x, z, color, letter) => {
-    ctx.fillStyle = color; ctx.strokeStyle = '#141a15'; ctx.lineWidth = 2 * k;
-    ctx.beginPath(); ctx.arc(toPx(x), toPx(z), 9 * k, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#f1ead9'; ctx.font = `700 ${11 * k}px "Overpass Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(letter, toPx(x), toPx(z) + 0.5 * k);
-  };
-  pin(R.start[0], R.start[1], '#86a35b', 'S');
-  pin(R.end[0], R.end[1], '#cf5d33', 'F');
-  for (const rc of remotes.values()) {
-    if (!rc.mesh.group.visible) continue;
-    const gpos = rc.mesh.group.position;
-    ctx.fillStyle = '#7fd0e6'; ctx.strokeStyle = '#141a15'; ctx.lineWidth = 2 * k;
-    ctx.beginPath(); ctx.arc(toPx(gpos.x), toPx(gpos.z), 6 * k, 0, 7); ctx.fill(); ctx.stroke();
-    if (big) { ctx.fillStyle = '#f1ead9'; ctx.font = `600 ${12 * k}px "Barlow Semi Condensed", sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(rc.name, toPx(gpos.x) + 9 * k, toPx(gpos.z)); }
-  }
-  fwd.set(0, 0, 1).applyQuaternion(car.q);
-  ctx.save(); ctx.translate(toPx(car.p.x), toPx(car.p.z)); ctx.rotate(Math.atan2(fwd.x, -fwd.z)); ctx.scale(k, k);
-  ctx.fillStyle = '#f0a53a'; ctx.strokeStyle = '#141a15'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(8, 9); ctx.lineTo(0, 4); ctx.lineTo(-8, 9); ctx.closePath(); ctx.stroke(); ctx.fill();
-  ctx.restore();
-}
-let hudTick = 0;
-function updateHud(now) {
-  drawCompass(); drawMapTo(mctx, mapC.width, false, now);
-  if (state.bigmap) drawMapTo(bctx, bigC.width, true, now);
-  const elapsed = state.finished ? state.elapsed : (now - state.t0) / 1000;
-  $('#hudTime').textContent = fmtTime(elapsed);
-  if (++hudTick % 4) return;
-  const toGo = Math.hypot(car.p.x - R.end[0], car.p.z - R.end[1]);
-  $('#hudToGo').textContent = state.finished ? 'Finished' : `${Math.round(toGo)} m to finish`;
-  const sp = Math.abs(car.v.dot(fwd.set(0, 0, 1).applyQuaternion(car.q))) * 3.6;
-  $('#hudSpeed').textContent = Math.round(sp);
-  const gearEl = $('#hudGear'); gearEl.textContent = car.low ? '4L' : '4H'; gearEl.classList.toggle('on', car.low);
-  $('#hudLights').classList.toggle('dim', !lightsOn()); $('#hudLights').classList.toggle('on', lightsOn());
-  $('#hudWinchChip').classList.toggle('dim', !car.winch); $('#hudWinchChip').classList.toggle('on', !!car.winch);
-  const hrs = sky.t * 24, hh = Math.floor(hrs), mm = Math.floor((hrs - hh) * 60);
-  $('#hudClock').textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-  $('#hudWeather').textContent = weather.rain > 0.3 ? (weather.kind === 'snow' ? 'Snow' : 'Rain') : 'Clear';
-  $('#hudCairns').textContent = `${cairnsFound()} / ${cairns.length}`;
-  const surfEl = $('#hudSurface'), wh = car.wheel.find(w => w.contact);
-  const depth = R.frozen ? 0 : R.wl - heightAt(car.p.x, car.p.z);
-  if (car.stalled) { surfEl.textContent = 'Engine flooded · press R'; surfEl.className = 'warn'; }
-  else if (depth > 0.15) { surfEl.textContent = `Water ${depth.toFixed(1)} m deep`; surfEl.className = depth > 0.8 ? 'warn' : ''; }
-  else { surfEl.textContent = wh ? wh.surf.name : 'Airborne'; surfEl.className = ''; }
-  $('#hudWinch').textContent = car.winch ? `${car.winch.len.toFixed(1)} m · ${car.winch.tension > 30000 ? 'max pull' : car.winch.tension > 1000 ? 'pulling' : 'slack'}` : 'Ready';
-}
-const lightsOn = () => state.lightsAuto ? (sky.night > 0.55 || weather.rain > 0.7) : state.lights;
-
-function updateCarVisual(dt, now) {
-  const g = carMesh.group;
-  g.position.copy(car.p); g.quaternion.copy(car.q);
-  car.wheel.forEach((wh, k) => {
-    const w = carMesh.wheels[k];
-    w.pivot.position.y = WHEELS[k][1] - clamp(wh.d - WR, REST - 0.42, REST);
-    w.pivot.rotation.y = k < 2 ? -car.steer : 0;
-    wh.angle += wh.spinV * dt; w.spin.rotation.x = wh.angle;
-  });
-  const on = lightsOn();
-  for (const s of carMesh.spots) s.intensity = on ? 2.2 : 0;
-  carMesh.lampMat.color.set(on ? 0xfff4d2 : 0x8a8576);
-  carMesh.tailMat.color.set(ctl.brake > 0 || ctl.handbrake ? 0xff3a22 : on ? 0xb02a1a : 0x6a1a12);
-  if (finishArch) finishArch.portalMat.opacity = 0.3 + 0.15 * Math.sin(now * 0.003);
-  for (const c of cairns) if (!c.found) c.flag.rotation.y = Math.sin(now * 0.002 + c.x) * 0.35;
-}
-
-let lastFlipMsg = 0;
-function vehicleChecks(dt, now) {
-  up.set(0, 1, 0).applyQuaternion(car.q);
-  if (!R.frozen && R.wl - car.p.y > 0.75 && !car.stalled) { car.stalled = true; car.winch = null; toast('Water reached the air intake. The engine is flooded. Press R to recover.', 4500); }
-  if (up.y < 0.3 && car.v.length() < 2) car.flipT += dt; else car.flipT = 0;
-  if (car.flipT > 2 && now - lastFlipMsg > 8000) { lastFlipMsg = now; toast('On your side. Press R to put the wheels back down.'); }
-  if (car.grounded === 4 && up.y > 0.85 && !car.stalled && (R.frozen || heightAt(car.p.x, car.p.z) > R.wl + 0.5)) {
-    car.safeT += dt;
-    if (car.safeT > 2) { car.safeT = 0; car.safe.copy(car.p); car.safeYaw = yawOf(car.q); }
-  }
-}
-
-/* ---------- Map select & start ---------- */
-const mapButtons = [...document.querySelectorAll('.map-btn')];
-mapButtons.forEach(b => {
-  b.querySelector('[data-dist]').textContent = `${Math.round(routeLen(REGIONS[+b.dataset.map]))} m start to finish`;
-  b.addEventListener('click', () => selectMap(+b.dataset.map, true));
-});
-function selectMap(i, broadcast) {
-  state.map = i;
-  mapButtons.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.map === i)));
-  if (state.loadedMap !== i) { buildRegion(null); placeAtStart(); }
-  if (broadcast) sendNet({ t: 'map', m: i });
-}
-function beginRun() {
-  placeAtStart();
-  car.low = false;
-  state.finished = false; state.t0 = performance.now();
-  cam.yawS = yawOf(car.q); cam.yaw = 0;
-  $('#touch').hidden = !isTouch;
-  const others = [...remotes.values()].filter(rc => rc.map === state.map && performance.now() - rc.last < 5000).length;
-  toast(`${R.name}. Drive to the finish arch ${Math.round(routeLen(R))} m away. Follow FINISH on your compass.${others ? ` ${others} other driver${others === 1 ? ' is' : 's are'} on this map.` : ''}`, 5200);
-}
-function start() {
-  if (state.started) return;
-  state.started = true;
-  $('#title').hidden = true; $('#hud').hidden = false;
-  $('#keys').hidden = !state.showKeys;
-  sizeCompass();
-  initAudio(); if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
-  if (state.loadedMap !== state.map) buildRegion(null);
-  beginRun();
-}
-$('#startBtn').addEventListener('click', start);
-$('#photoHint').addEventListener('click', () => { if (state.photo) press('KeyP'); });
-if (isTouch) $('#photoHint').textContent = 'Photo mode · drag to orbit · tap here to exit';
-
-function resize() {
-  const w = innerWidth, h = innerHeight;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); sizeCompass();
-}
-addEventListener('resize', resize);
-
-/* ---------- Main loop ---------- */
-let last = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  pollGamepad(dt);
-  if (!state.photo) {
-    updateControls(dt);
-    const sub = Math.min(12, Math.ceil(dt / (1 / 240)));
-    for (let i = 0; i < sub; i++) step(dt / sub);
-    collideObstacles();
-    updateWinch(dt);
-    if (state.started) { checkObjectives(now); vehicleChecks(dt, now); }
-    fwd.set(0, 0, 1).applyQuaternion(car.q);
-    emitWheelParticles(dt);
-  }
-  particles.update(state.photo ? 0 : dt);
-  updateCarVisual(state.photo ? 0 : dt, now);
-  updateRemotes(dt, now);
-  updateCamera(dt, now);
-  updateSky(dt);
-  updateWeather(state.photo ? 0 : dt);
-  if (state.started && !state.photo) updateHud(now);
-  netSend(now);
-  updateAudio();
-  renderer.render(scene, camera);
-  requestAnimationFrame(frame);
-}
-
-function boot(data) {
-  data = data || {};
-  if (Number.isInteger(data.map)) state.map = data.map;
-  mapButtons.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.map === state.map)));
-  if (typeof data.paint === 'number') { state.paint = data.paint; carMesh.paint.color.set(PAINTS[state.paint][1]); }
-  if (typeof data.t === 'number') sky.t = data.t;
-  buildRegion(data.found || null);
-  placeAtStart();
-  resize();
-  updateNetStatus();
-  if (data.started && !data.finished) {
-    start();
-    if (data.p && data.q) { car.p.fromArray(data.p); car.q.fromArray(data.q); car.low = !!data.low; }
-    if (typeof data.elapsed === 'number') state.t0 = performance.now() - data.elapsed * 1000;
-  }
-  netConnect();
-  requestAnimationFrame(t => { last = t; frame(t); });
-}
-if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
-  window.claude.hot.snapshot(() => ({ started: state.started, finished: state.finished, map: state.map, found: cairns.map(c => c.found), p: car.p.toArray(), q: car.q.toArray(),
-    t: sky.t, low: car.low, paint: state.paint, elapsed: (performance.now() - state.t0) / 1000 }));
-}
-const hot = window.claude && window.claude.hot;
-if (hot && hot.ready) hot.ready(boot); else boot((hot && hot.data) || {});
-})();
-</script>
+<script src="js/util.js"></script>
+<script src="js/regions.js"></script>
+<script src="js/himalaya.js"></script>
+<script src="js/moon.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/world.js"></script>
+<script src="js/cars.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/car.js"></script>
+<script src="js/input.js"></script>
+<script src="js/gameplay.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/net.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/minimap.js"></script>
+<script src="js/main.js"></script>
